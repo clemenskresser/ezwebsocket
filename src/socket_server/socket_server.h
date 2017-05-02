@@ -13,7 +13,7 @@
 
 struct socket_init
 {
-  size_t (*socket_onmessage)(void *socketUserData, void *clientDesc, void *clientUserData, void *msg, size_t len);
+  size_t (*socket_onMessage)(void *socketUserData, void *clientDesc, void *clientUserData, void *msg, size_t len);
   void* (*socket_onOpen)(void *socketUserData, void *clientDesc);
   void (*socket_onClose)(void *socketUserData, void *clientDesc, void *clientUserData);
   char *port;

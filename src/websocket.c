@@ -43,7 +43,7 @@ enum ws_opcode
 
 struct websocket_desc
 {
-  void (*ws_onmessage)(void *websocketUserData, void *clientDesc, void *clientUserData, enum ws_data_type dataType, void *msg, size_t len);
+  void (*ws_onMessage)(void *websocketUserData, void *clientDesc, void *clientUserData, enum ws_data_type dataType, void *msg, size_t len);
   void* (*ws_onOpen)(void *websocketUserData, void *clientDesc);
   void (*ws_onClose)(void *websocketUserData, void *clientDesc, void *clientUserData);
   void *socketDesc;
@@ -929,8 +929,8 @@ static size_t websocket_onMessage(void *socketUserData, void *socketClientDesc, 
           return wsHeader.payloadLength + wsHeader.payloadStartOffset;
 
         case WS_MSG_STATE_USER_DATA:
-          if(wsDesc->ws_onmessage)
-            wsDesc->ws_onmessage(wsDesc->wsSocketUserData, wsClientDesc, wsClientDesc->clientUserData, wsClientDesc->lastMessage.dataType,
+          if(wsDesc->ws_onMessage)
+            wsDesc->ws_onMessage(wsDesc->wsSocketUserData, wsClientDesc, wsClientDesc->clientUserData, wsClientDesc->lastMessage.dataType,
                 wsClientDesc->lastMessage.data, wsClientDesc->lastMessage.len);
           if(wsClientDesc->lastMessage.data)
             refcnt_unref(wsClientDesc->lastMessage.data);
@@ -1148,14 +1148,14 @@ void *websocket_open(struct websocket_init *wsInit, void *websocketUserData)
 
   wsDesc->ws_onOpen = wsInit->ws_onOpen;
   wsDesc->ws_onClose = wsInit->ws_onClose;
-  wsDesc->ws_onmessage = wsInit->ws_onmessage;
+  wsDesc->ws_onMessage = wsInit->ws_onMessage;
   wsDesc->wsSocketUserData = websocketUserData;
 
   socketInit.address = wsInit->address;
   socketInit.port = wsInit->port;
   socketInit.socket_onOpen = websocket_onOpen;
   socketInit.socket_onClose = websocket_onClose;
-  socketInit.socket_onmessage = websocket_onMessage;
+  socketInit.socket_onMessage = websocket_onMessage;
 
   wsDesc->socketDesc = socketServer_open(&socketInit, wsDesc);
   if(!wsDesc->socketDesc)

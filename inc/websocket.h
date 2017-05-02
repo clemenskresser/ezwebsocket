@@ -40,7 +40,7 @@ enum ws_close_code
 
 struct websocket_init
 {
-  void (*ws_onmessage)(void *wsDesc, void *clientDesc, void *userData, enum ws_data_type dataType, void *msg, size_t len);
+  void (*ws_onMessage)(void *wsDesc, void *clientDesc, void *userData, enum ws_data_type dataType, void *msg, size_t len);
   void* (*ws_onOpen)(void *wsDesc, void *clientDesc);
   void (*ws_onClose)(void *wsDesc, void *clientDesc, void *userData);
   char *address;
