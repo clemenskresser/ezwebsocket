@@ -54,7 +54,7 @@ struct socket_desc
 {
   struct socket_client_list_element *list;
   pthread_mutex_t mutex;
-  size_t (*socket_onmessage)(void *socketUserData, void *clientDesc, void *clientUserData, void *msg, size_t len);
+  size_t (*socket_onMessage)(void *socketUserData, void *clientDesc, void *clientUserData, void *msg, size_t len);
   void* (*socket_onOpen)(void *socketUserData, void *clientDesc);
   void (*socket_onClose)(void *socketUserData, void *clientDesc, void *clientUserData);
   void *socketUserData;
@@ -232,7 +232,7 @@ static void *clientThread(void *params)
         {
           do
           {
-            count = clientDesc->socketDesc->socket_onmessage(clientDesc->socketDesc->socketUserData, clientDesc, clientDesc->client_data,
+            count = clientDesc->socketDesc->socket_onMessage(clientDesc->socketDesc->socketUserData, clientDesc, clientDesc->client_data,
                 DYNBUFFER_BUFFER(&(clientDesc->buffer)), DYNBUFFER_SIZE(&(clientDesc->buffer)));
             dynBuffer_removeTrailingBytes(&(clientDesc->buffer), count);
           } while(count && DYNBUFFER_SIZE(&(clientDesc->buffer)) && (clientDesc->state == SOCKET_CLIENT_STATE_CONNECTED));
@@ -418,7 +418,7 @@ void *socketServer_open(struct socket_init *socketInit, void *socketUserData)
 
   socketDesc->socket_onClose = socketInit->socket_onClose;
   socketDesc->socket_onOpen = socketInit->socket_onOpen;
-  socketDesc->socket_onmessage = socketInit->socket_onmessage;
+  socketDesc->socket_onMessage = socketInit->socket_onMessage;
   socketDesc->socketUserData = socketUserData;
   socketDesc->list = NULL;
   pthread_mutex_init(&socketDesc->mutex, NULL);
