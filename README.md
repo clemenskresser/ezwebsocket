@@ -7,6 +7,7 @@ Simple Websocket Library written in C
 * Passes all tests of autobahn test suite
 * No external dependencies except pthreads
 * reference counting for buffers and descriptors
+* MIT License
 
 # Installation:
 
