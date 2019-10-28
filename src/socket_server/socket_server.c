@@ -42,6 +42,7 @@ struct socket_client_desc
   pthread_t tid;
   struct dyn_buffer buffer;
   void *client_data;
+  unsigned long timeout_sec;
 };
 
 struct socket_client_list_element
@@ -63,6 +64,7 @@ struct socket_desc
   volatile bool running;
   pthread_t tid;
   unsigned long numConnections;
+  unsigned long client_timeout_sec;
 };
 
 /**
@@ -186,8 +188,13 @@ static void *clientThread(void *params)
   int increase;
   size_t bytesFree;
   bool first;
+  struct timeval timeout;
+  struct timeval *timeout_p = &timeout;
 
   pthread_detach(pthread_self());
+
+  if(clientDesc->timeout_sec == 0)
+    timeout_p = NULL;
 
   clientDesc->client_data = clientDesc->socketDesc->socket_onOpen(clientDesc->socketDesc->socketUserData, clientDesc);
 
@@ -195,7 +202,10 @@ static void *clientThread(void *params)
   FD_SET(clientDesc->clientSocketFd, &readfds);
   while(clientDesc->state == SOCKET_CLIENT_STATE_CONNECTED)
   {
-    if(select(clientDesc->clientSocketFd + 1, &readfds, NULL, NULL, NULL) < 0)
+    if(timeout_p)
+      timeout_p->tv_sec = clientDesc->timeout_sec;
+
+    if(select(clientDesc->clientSocketFd + 1, &readfds, NULL, NULL, timeout_p) < 0)
     {
       log_err("error in select");
     }
@@ -276,6 +286,7 @@ static int startClient(int socketFd, struct socket_desc *socketDesc)
   desc->socketDesc = socketDesc;
   dynBuffer_init(&(desc->buffer));
   desc->client_data = NULL;
+  desc->timeout_sec = socketDesc->client_timeout_sec;
 
   addClient(socketDesc, desc);
   desc->state = SOCKET_CLIENT_STATE_CONNECTED;
@@ -421,6 +432,7 @@ void *socketServer_open(struct socket_init *socketInit, void *socketUserData)
   socketDesc->socket_onMessage = socketInit->socket_onMessage;
   socketDesc->socketUserData = socketUserData;
   socketDesc->list = NULL;
+  socketDesc->client_timeout_sec = socketInit->client_timeout_sec;
   pthread_mutex_init(&socketDesc->mutex, NULL);
 
   for(iter = serverinfo; iter != NULL; iter = iter->ai_next)

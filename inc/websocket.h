@@ -45,6 +45,7 @@ struct websocket_init
   void (*ws_onClose)(void *wsDesc, void *clientDesc, void *userData);
   char *address;
   char *port;
+  unsigned long *client_timeout_sec;
 };
 
 /**

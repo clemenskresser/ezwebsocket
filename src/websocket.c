@@ -1153,6 +1153,12 @@ void *websocket_open(struct websocket_init *wsInit, void *websocketUserData)
 
   socketInit.address = wsInit->address;
   socketInit.port = wsInit->port;
+
+  if(wsInit->client_timeout_sec)
+    socketInit.client_timeout_sec = *(wsInit->client_timeout_sec);
+  else
+    socketInit.client_timeout_sec = 0;
+
   socketInit.socket_onOpen = websocket_onOpen;
   socketInit.socket_onClose = websocket_onClose;
   socketInit.socket_onMessage = websocket_onMessage;

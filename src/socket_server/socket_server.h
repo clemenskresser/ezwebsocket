@@ -18,6 +18,7 @@ struct socket_init
   void (*socket_onClose)(void *socketUserData, void *clientDesc, void *clientUserData);
   char *port;
   char *address;
+  unsigned long client_timeout_sec;
 };
 
 void socketServer_closeClient(void *socketClientDesc);
