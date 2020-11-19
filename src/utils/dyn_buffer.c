@@ -75,14 +75,14 @@ int dynBuffer_increase_to(struct dyn_buffer *buffer, size_t numFreeBytes)
 }
 
 /**
- * \brief: removes the given amount of trailing bytes from the buffer
+ * \brief: removes the given amount of leading bytes from the buffer
  *
  * \param *buffer: pointer to the buffer
  * \param count: the number of bytes that should be removed
  *
  * \return 0 if successful else -1
  */
-int dynBuffer_removeTrailingBytes(struct dyn_buffer *buffer, size_t count)
+int dynBuffer_removeLeadingBytes(struct dyn_buffer *buffer, size_t count)
 {
   char *newbuf = NULL;
 
@@ -101,19 +101,10 @@ int dynBuffer_removeTrailingBytes(struct dyn_buffer *buffer, size_t count)
     return -1;
   }
 
-  if(buffer->used != count)   //TODO: make this more intelligent
+  if(buffer->used > count)
   {
-    newbuf = malloc(buffer->size - count);
-    if(!newbuf)
-    {
-      log_err("malloc failed");
-      return -1;
-    }
-    memcpy(newbuf, &buffer->buffer[count], buffer->used - count);
-    free(buffer->buffer);
-    buffer->buffer = newbuf;
-    buffer->used = buffer->used - count;
-    buffer->size = buffer->size - count;
+	buffer->used = buffer->used - count;
+	memmove(&buffer->buffer[0], &buffer->buffer[count], buffer->used);
   }
   else
   {

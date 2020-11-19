@@ -186,6 +186,7 @@ static void *clientThread(void *params)
   int increase;
   size_t bytesFree;
   bool first;
+  struct timeval tv;
 
   pthread_detach(pthread_self());
 
@@ -195,11 +196,11 @@ static void *clientThread(void *params)
   FD_SET(clientDesc->clientSocketFd, &readfds);
   while(clientDesc->state == SOCKET_CLIENT_STATE_CONNECTED)
   {
-    if(select(clientDesc->clientSocketFd + 1, &readfds, NULL, NULL, NULL) < 0)
-    {
-      log_err("error in select");
-    }
-    else
+    tv.tv_sec = 0;
+    tv.tv_usec = 300000;
+    FD_ZERO(&readfds);
+    FD_SET(clientDesc->clientSocketFd, &readfds);
+    if(select(clientDesc->clientSocketFd + 1, &readfds, NULL, NULL, &tv) > 0)
     {
       if(FD_ISSET(clientDesc->clientSocketFd, &readfds))
       {
@@ -234,7 +235,7 @@ static void *clientThread(void *params)
           {
             count = clientDesc->socketDesc->socket_onMessage(clientDesc->socketDesc->socketUserData, clientDesc, clientDesc->client_data,
                 DYNBUFFER_BUFFER(&(clientDesc->buffer)), DYNBUFFER_SIZE(&(clientDesc->buffer)));
-            dynBuffer_removeTrailingBytes(&(clientDesc->buffer), count);
+            dynBuffer_removeLeadingBytes(&(clientDesc->buffer), count);
           } while(count && DYNBUFFER_SIZE(&(clientDesc->buffer)) && (clientDesc->state == SOCKET_CLIENT_STATE_CONNECTED));
         }
       }

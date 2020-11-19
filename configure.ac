@@ -1,6 +1,6 @@
 
 AC_PREREQ([2.61])
-AC_INIT([ezwebsocket], [0.1], [clemens.kresser@gmail.com])
+AC_INIT([ezwebsocket], [1.0], [clemens.kresser@gmail.com])
 AC_CONFIG_AUX_DIR(aux-dist)
 AM_INIT_AUTOMAKE
 

@@ -17,3 +17,8 @@ libtool
 *.la
 *.lo
 *.o
+.cproject
+.project
+.settings/
+tests/bin/
+tests/reports/

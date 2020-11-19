@@ -29,7 +29,7 @@ struct dyn_buffer
 
 void dynBuffer_init(struct dyn_buffer *buffer);
 int dynBuffer_increase_to(struct dyn_buffer *buffer, size_t numFreeBytes);
-int dynBuffer_removeTrailingBytes(struct dyn_buffer *buffer, size_t count);
+int dynBuffer_removeLeadingBytes(struct dyn_buffer *buffer, size_t count);
 int dynBuffer_delete(struct dyn_buffer *buffer);
 
 #endif /* DYN_BUFFER_H_ */
