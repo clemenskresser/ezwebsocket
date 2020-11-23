@@ -227,7 +227,7 @@ static void *clientThread(void *params)
             DYNBUFFER_INCREASE_WRITE_POS((&(clientDesc->buffer)), n);
           else
             break;
-        } while((n == bytesFree) && (clientDesc->state == SOCKET_CLIENT_STATE_CONNECTED));
+        } while(((size_t)n == bytesFree) && (clientDesc->state == SOCKET_CLIENT_STATE_CONNECTED));
 
         if(clientDesc->state == SOCKET_CLIENT_STATE_CONNECTED)
         {
@@ -326,7 +326,7 @@ int socketServer_send(void *socketClientDesc, void *msg, size_t len)
   {
     log_err("send failed: %s", strerror(errno));
   }
-  return (rc == len ? 0 : -1);
+  return ((size_t)rc == len ? 0 : -1);
 }
 
 #define BUFSIZE 20

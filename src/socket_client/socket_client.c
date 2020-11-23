@@ -116,7 +116,7 @@ static void* socketClientThread(void *socketDescriptor)
             DYNBUFFER_INCREASE_WRITE_POS((&(socketDesc->buffer)), n);
           else
             break;
-        }while((n == bytesFree) && (socketDesc->state == SOCKET_CLIENT_STATE_CONNECTED));
+        }while(((size_t)n == bytesFree) && (socketDesc->state == SOCKET_CLIENT_STATE_CONNECTED));
 
         if(socketDesc->state == SOCKET_CLIENT_STATE_CONNECTED)
         {
@@ -168,7 +168,7 @@ int socketClient_send(void *socketDescriptor, void *msg, size_t len)
   {
     log_err("send failed: %s", strerror(errno));
   }
-  return (rc == len ? 0 : -1);
+  return ((size_t)rc == len ? 0 : -1);
 }
 
 /**

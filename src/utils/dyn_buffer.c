@@ -84,8 +84,6 @@ int dynBuffer_increase_to(struct dyn_buffer *buffer, size_t numFreeBytes)
  */
 int dynBuffer_removeLeadingBytes(struct dyn_buffer *buffer, size_t count)
 {
-  char *newbuf = NULL;
-
   if(buffer->buffer == NULL)
   {
     log_err("empty buffer");

@@ -197,7 +197,7 @@ static int parseHttpHeader(char *wsHeader, size_t len, char *key)
     cpnt++;
   }
 
-  for(i = 0; (i < WS_HS_KEY_LEN - 1) && isgraph(cpnt[i]) && ((&cpnt[i] - wsHeader) < len); i++)
+  for(i = 0; (i < WS_HS_KEY_LEN - 1) && isgraph(cpnt[i]) && ((size_t)(&cpnt[i] - wsHeader) < len); i++)
   {
     key[i] = cpnt[i];
   }
@@ -233,7 +233,7 @@ static int sendWsHandshakeReply(void *socketClientDesc, char *replyKey)
 {
   char replyHeader[strlen(WS_HANDSHAKE_REPLY_BLUEPRINT) + 28];
 
-  if(snprintf(replyHeader, sizeof(replyHeader), WS_HANDSHAKE_REPLY_BLUEPRINT, replyKey) >= sizeof(replyHeader))
+  if(snprintf(replyHeader, sizeof(replyHeader), WS_HANDSHAKE_REPLY_BLUEPRINT, replyKey) >= (int)sizeof(replyHeader))
   {
     log_err("problem with the handshake reply key (buffer to small)");
     return -1;
@@ -262,7 +262,7 @@ static bool checkWsHandshakeReply(struct websocket_session_desc *wsSessionDesc, 
   struct websocket_client_desc *wsDesc = wsSessionDesc->wsDesc.wsClientDesc;
 
   char *cpnt;
-  int i;
+  unsigned long i;
   char key[30];
   char *acceptString = NULL;
   bool retVal = false;
@@ -284,7 +284,7 @@ static bool checkWsHandshakeReply(struct websocket_session_desc *wsSessionDesc, 
       return false;
   }
 
-  for(i = 0; (i < sizeof(key) - 1) && isgraph(cpnt[i]) && ((&cpnt[i] - header) < *len); i++)
+  for(i = 0; (i < sizeof(key) - 1) && isgraph(cpnt[i]) && ((size_t)(&cpnt[i] - header) < *len); i++)
   {
     key[i] = cpnt[i];
   }
@@ -322,7 +322,7 @@ static bool checkWsHandshakeReply(struct websocket_session_desc *wsSessionDesc, 
 static bool sendWsHandshakeRequest(struct websocket_client_desc *wsDesc)
 {
   unsigned char wsKeyBytes[16];
-  int i;
+  unsigned long i;
   char *requestHeader = NULL;
   bool success = false;
 
@@ -452,7 +452,7 @@ static int parseWebsocketHeader(const unsigned char *data, size_t len, struct ws
   }
 
   header->masked = (data[1] & 0x80) ? true : false;
-  int i, lengthNumBytes;
+  size_t i, lengthNumBytes;
 
   if(len < 2)
   {
@@ -715,13 +715,12 @@ enum ws_msg_state
  *
  * \param *wsSessionDesc: pointer to the websocket session descriptor
  * \param *data: pointer to the payload data
- * \param len: the length of the payload data
  * \param *header: pointer to the parsed websocket header structure
  *
  * \return: the message state
  */
 static enum ws_msg_state handleFirstMessage(struct websocket_session_desc *wsSessionDesc, const unsigned char *data,
-                                            size_t len, struct ws_header *header)
+                                            struct ws_header *header)
 {
   size_t i;
 
@@ -793,13 +792,12 @@ static enum ws_msg_state handleFirstMessage(struct websocket_session_desc *wsSes
  *
  * \param *wsSessionDesc: pointer to the websocket session descriptor
  * \param *data: pointer to the payload data
- * \param len: the length of the payload data
  * \param *header: pointer to the parsed websocket header structure
  *
  * \return: the message state
  */
 static enum ws_msg_state handleContMessage(struct websocket_session_desc *wsSessionDesc, const unsigned char *data,
-                                           size_t len, struct ws_header *header)
+                                           struct ws_header *header)
 {
   size_t i;
   char *temp;
@@ -888,13 +886,12 @@ static enum ws_msg_state handleContMessage(struct websocket_session_desc *wsSess
  *
  * \param *wsSessionDesc: pointer to the websocket client descriptor
  * \param *data: pointer to the payload data
- * \param len: the length of the payload data
  * \param *header: pointer to the parsed websocket header structure
  *
  * \return: the message state
  */
 static enum ws_msg_state handlePingMessage(struct websocket_session_desc *wsSessionDesc, const unsigned char *data,
-                                           size_t len, struct ws_header *header)
+                                           struct ws_header *header)
 {
   int rc;
   char *temp;
@@ -955,14 +952,15 @@ static enum ws_msg_state handlePingMessage(struct websocket_session_desc *wsSess
  *
  * \param *wsClientDesc: pointer to the websocket client descriptor
  * \param *data: pointer to the payload data
- * \param len: the length of the payload data
  * \param *header: pointer to the parsed websocket header structure
  *
  * \return: the message state
  */
 static enum ws_msg_state handlePongMessage(struct websocket_session_desc *wsClientDesc, const unsigned char *data,
-                                           size_t len, struct ws_header *header)
+                                           struct ws_header *header)
 {
+  (void) data;
+
   if(header->fin && (header->payloadLength <= MAX_DEFAULT_PAYLOAD_LENGTH))
   {
     //Pongs are ignored now because actually we also don't send pings
@@ -980,13 +978,12 @@ static enum ws_msg_state handlePongMessage(struct websocket_session_desc *wsClie
  *
  * \param *wsClientDesc: pointer to the websocket client descriptor
  * \param *data: pointer to the payload data
- * \param len: the length of the payload data
  * \param *header: pointer to the parsed websocket header structure
  *
  * \return: the message state
  */
 static enum ws_msg_state handleDisconnectMessage(struct websocket_session_desc *wsSessionDesc,
-                                                 const unsigned char *data, size_t len, struct ws_header *header)
+                                                 const unsigned char *data, struct ws_header *header)
 {
   size_t i;
   int rc;
@@ -1098,19 +1095,19 @@ static enum ws_msg_state parseMessage(struct websocket_session_desc *wsSessionDe
   {
     case WS_OPCODE_TEXT:
     case WS_OPCODE_BINARY:
-      return handleFirstMessage(wsSessionDesc, data, len, header);
+      return handleFirstMessage(wsSessionDesc, data, header);
 
     case WS_OPCODE_CONTINUATION:
-      return handleContMessage(wsSessionDesc, data, len, header);
+      return handleContMessage(wsSessionDesc, data, header);
 
     case WS_OPCODE_PING:
-      return handlePingMessage(wsSessionDesc, data, len, header);
+      return handlePingMessage(wsSessionDesc, data, header);
 
     case WS_OPCODE_PONG:
-      return handlePongMessage(wsSessionDesc, data, len, header);
+      return handlePongMessage(wsSessionDesc, data, header);
 
     case WS_OPCODE_DISCONNECT:
-      return handleDisconnectMessage(wsSessionDesc, data, len, header);
+      return handleDisconnectMessage(wsSessionDesc, data, header);
 
     default:
       log_err("unknown opcode (%d)", header->opcode);
@@ -1175,6 +1172,7 @@ static void* websocket_onOpen(void *socketUserData, void *socketClientDesc)
 static void* websocketClient_onOpen(void *socketUserData, void *socketDesc)
 {
   struct websocket_client_desc *wsDesc = socketUserData;
+  (void)socketDesc;
 
   if(wsDesc->ws_onOpen)
     wsDesc->session.sessionUserData = wsDesc->ws_onOpen( wsDesc->wsUserData, wsDesc, &wsDesc->session);
@@ -1227,6 +1225,7 @@ static void websocket_onClose(void *socketUserData, void *socketClientDesc, void
 {
   struct websocket_desc *wsDesc = socketUserData;
   struct websocket_session_desc *wsSessionDesc = sessionDescriptor;
+  (void)socketClientDesc;
 
   if(wsDesc == NULL)
   {

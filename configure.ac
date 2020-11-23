@@ -8,7 +8,7 @@ AC_PROG_MAKE_SET
 AC_PROG_CC
 AC_LANG(C)
 
-CFLAGS="-std=gnu99 -fPIC"
+CFLAGS="-std=gnu99 -fPIC -Wall -Wextra"
 
 AC_CONFIG_MACRO_DIR([m4])
 

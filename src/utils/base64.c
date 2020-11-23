@@ -55,7 +55,7 @@ char *base64_encode(unsigned char *data, size_t len)
 {
   char *encString = malloc(((len + 2) / 3) * 4 + 1);
   char *ptr;
-  int i;
+  size_t i;
   unsigned char help[3];
   int count;
 

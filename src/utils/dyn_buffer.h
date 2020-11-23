@@ -15,8 +15,8 @@
 struct dyn_buffer
 {
   char *buffer;
-  int used;
-  int size;
+  size_t used;
+  size_t size;
 };
 
 #define DYNBUFFER_INCREASE_STEPS 1024
