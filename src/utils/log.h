@@ -1,9 +1,11 @@
-/*
- * log.h
+/**
+ * \file      log.h
+ * \author    Clemens Kresser
+ * \date      Apr 12, 2017
+ * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
+ * \license   This project is released under the MIT License.
+ * \brief     logging for the ezwebsocket library
  *
- *  Created on: Apr 12, 2017
- *      Author: Clemens Kresser
- *      License: MIT
  */
 
 #ifndef UTILS_LOG_H_
@@ -11,7 +13,7 @@
 
 #include <stdbool.h>
 
-void log_enableDebug (bool enabled);
+void log_enableDebug (bool enable);
 extern bool debugEnabled;
 
 #define log_err(FMT, ...)      do { fprintf(stderr, "%s:%s: " FMT "\n", __FILE__, __func__, ##__VA_ARGS__); } while (0)

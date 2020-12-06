@@ -1,20 +1,23 @@
-/*
- * stringck.c
+/**
+ * \file      stringck.c
+ * \author    Clemens Kresser
+ * \date      Mar 25, 2017
+ * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
+ * \license   This project is released under the MIT License.
+ * \brief     implements strnstr if it's not available
  *
- *  Created on: Mar 25, 2017
- *      Author: Clemens Kresser
- *      License: MIT
  */
 
 #include <string.h>
 #include <stddef.h>
 
+#ifndef strnstr
 /**
- * \brief: searches for needle in haystack
+ * \brief Searches for needle in haystack
  *
- * *haystack: the string that should be scanned
- * *needle: the wanted string
- * haystacklen: length of haystack
+ * *haystack The string that should be scanned
+ * *needle The wanted string
+ * haystacklen Length of haystack
  *
  */
 char *strnstr(char *haystack, char *needle, size_t haystacklen)
@@ -29,3 +32,4 @@ char *strnstr(char *haystack, char *needle, size_t haystacklen)
 
   return 0;
 }
+#endif

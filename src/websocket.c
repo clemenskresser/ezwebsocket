@@ -1,9 +1,11 @@
-/*
- * websocket.c
+/**
+ * \file      websocket.c
+ * \author    Clemens Kresser
+ * \date      Mar 23, 2017
+ * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
+ * \license   This project is released under the MIT License.
+ * \brief     handles the websocket specific stuff
  *
- *  Created on: Mar 23, 2017
- *      Author: Clemens Kresser
- *      License: MIT
  */
 
 #define _GNU_SOURCE

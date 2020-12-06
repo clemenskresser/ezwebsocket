@@ -1,11 +1,12 @@
-/*
- * dyn_buffer.c
+/**
+ * \file      dyn_buffer.c
+ * \author    Clemens Kresser
+ * \date      Mar 23, 2017
+ * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
+ * \license   This project is released under the MIT License.
+ * \brief     dynamic buffers that are used to merge and split received data
  *
- *  Created on: Mar 23, 2017
- *      Author: Clemens Kresser
- *      License: MIT
  */
-
 
 #include "dyn_buffer.h"
 
@@ -90,7 +91,7 @@ int dynBuffer_removeLeadingBytes(struct dyn_buffer *buffer, size_t count)
     return -1;
   }
 
-  if (!count)
+  if(!count)
     return 0;
 
   if(buffer->used < count)
@@ -101,8 +102,8 @@ int dynBuffer_removeLeadingBytes(struct dyn_buffer *buffer, size_t count)
 
   if(buffer->used > count)
   {
-	buffer->used = buffer->used - count;
-	memmove(&buffer->buffer[0], &buffer->buffer[count], buffer->used);
+    buffer->used = buffer->used - count;
+    memmove(&buffer->buffer[0], &buffer->buffer[count], buffer->used);
   }
   else
   {

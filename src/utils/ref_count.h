@@ -1,8 +1,11 @@
-/*
- * ref_count.h
+/**
+ * \file      ref_count.h
+ * \author    Clemens Kresser
+ * \date      Mar 26, 2017
+ * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
+ * \license   This project is released under the MIT License.
+ * \brief     simple reference counting implementation
  *
- *  Created on: Mar 26, 2017
- *      Author: clemens
  */
 
 #ifndef UTILS_REF_COUNT_H_

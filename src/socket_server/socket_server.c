@@ -1,9 +1,11 @@
-/*
- * socket_server.c
+/**
+ * \file      socket_server.c
+ * \author    Clemens Kresser
+ * \date      Mar 23, 2017
+ * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
+ * \license   This project is released under the MIT License.
+ * \brief     event based socket server implementation
  *
- *  Created on: Mar 23, 2017
- *      Author: Clemens Kresser
- *      License: MIT
  */
 
 #include "socket_server.h"

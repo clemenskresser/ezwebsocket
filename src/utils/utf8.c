@@ -1,9 +1,11 @@
-/*
- * utf8.c
+/**
+ * \file      utf8.c
+ * \author    Clemens Kresser
+ * \date      Apr 9, 2017
+ * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
+ * \license   This project is released under the MIT License.
+ * \brief     UTF8 validation functions that are used for the websockets
  *
- *  Created on: Apr 9, 2017
- *      Author: Clemens Kresser
- *      License: MIT
  */
 
 #include "utf8.h"

@@ -1,9 +1,11 @@
-/*
- * socket_client.c
+/**
+ * \file      socket_client.c
+ * \author    Clemens Kresser
+ * \date      Jun 26, 2020
+ * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
+ * \license   This project is released under the MIT License.
+ * \brief     event based socket client implementation
  *
- *  Created on: Jun 26, 2020
- *      Author: Clemens Kresser
- *      License: MIT
  */
 
 #include <stdlib.h>
