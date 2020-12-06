@@ -38,18 +38,25 @@ enum ws_close_code
   WS_CLOSE_CODE_RESERVED_3 = 1015,
 };
 
+//! descriptor for the websocket server
+struct websocket_server_desc;
+//! descriptor for the websocket connection
+struct websocket_connection_desc;
+//! descriptor for the websocket client
+struct websocket_client_desc;
+
 //! NOTE  this define is for backward compatibility
 //!       it should not be used anymore but will not be
 //!       removed unless there's a good reason
 struct websocket_init
 {
   //! callback that is called when a message is received
-  void (*ws_onMessage)(void *websocketUserData, void *clientDesc, void *clientUserData,
-          enum ws_data_type dataType, void *msg, size_t len);
+  void (*ws_onMessage)(void *websocketUserData, void *clientDesc, void *clientUserData, enum ws_data_type dataType,
+                       void *msg, size_t len);
   //! callback that is called when a new connection is established
   void* (*ws_onOpen)(void *wsDesc, void *clientDesc);
   //! callback that is called when a connection is closed
-  void (*ws_onClose)(void *wsDesc, void *clientDesc, void *userData);
+  void (*ws_onClose)(void *socketUserData, void *clientDesc, void *userData);
   //! the listening address
   char *address;
   //! the listening port
@@ -59,12 +66,13 @@ struct websocket_init
 struct websocket_server_init
 {
   //! callback that is called when a message is received
-  void (*ws_onMessage)(void *websocketUserData, void *clientDesc, void *clientUserData,
-          enum ws_data_type dataType, void *msg, size_t len);
+  void (*ws_onMessage)(void *websocketUserData, struct websocket_connection_desc *connectionDesc, void *clientUserData,
+                       enum ws_data_type dataType, void *msg, size_t len);
   //! callback that is called when a new connection is established
-  void* (*ws_onOpen)(void *wsDesc, void *clientDesc);
+  void* (*ws_onOpen)(void *websocketUserData, struct websocket_server_desc *wsDesc, struct websocket_connection_desc *connectionDesc);
   //! callback that is called when a connection is closed
-  void (*ws_onClose)(void *wsDesc, void *clientDesc, void *userData);
+  void (*ws_onClose)(struct websocket_server_desc *wsDesc, void *websocketUserData, struct websocket_connection_desc *connectionDesc,
+                     void *userData);
   //! the listening address
   char *address;
   //! the listening port
@@ -74,12 +82,13 @@ struct websocket_server_init
 struct websocket_client_init
 {
   //! callback that is called when a message is received
-  void (*ws_onMessage)(void *socketUserData, void *sessionDesc, void *sessionUserData,
-		  enum ws_data_type dataType, void *msg, size_t len);
+  void (*ws_onMessage)(void *socketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData,
+                       enum ws_data_type dataType, void *msg, size_t len);
   //! callback that is called when a new connection is established
-  void* (*ws_onOpen)(void *socketUserData, void *wsDesc, void *sessionDesc);
+  void* (*ws_onOpen)(void *socketUserData, struct websocket_client_desc *wsDesc,
+                     struct websocket_connection_desc *connectionDesc);
   //! callback that is called when a connection is closed
-  void (*ws_onClose)(void *socketUserData, void *sessionDesc, void *sessionUserData);
+  void (*ws_onClose)(void *socketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData);
   //! the address of the remote target
   const char *address;
   //! the port of the remote target
@@ -90,14 +99,15 @@ struct websocket_client_init
   const char *endpoint;
 };
 
+
+
 /**
  * \brief: returns the user data of the given client
  *
- * \param *wsSessionDesc: pointer to the websocket client descriptor
+ * \param *wsConnectionDesc: pointer to the websocket client descriptor
  *
  */
-void *websocket_getClientUserData(void *wsSessionDesc);
-
+void* websocket_getConnectionUserData(struct websocket_connection_desc *wsConnectionDesc);
 
 /**
  * \brief: opens a websocket server
@@ -107,7 +117,7 @@ void *websocket_getClientUserData(void *wsSessionDesc);
  *
  * \return: the websocket descriptor or NULL in case of error
  */
-void *websocketServer_open(struct websocket_server_init *wsInit, void *userData);
+struct websocket_server_desc *websocketServer_open(struct websocket_server_init *wsInit, void *websocketUserData);
 
 /**
  * \brief opens a websocket client connection
@@ -115,9 +125,9 @@ void *websocketServer_open(struct websocket_server_init *wsInit, void *userData)
  * \param wsInit: pointer to the init struct
  * \param websocketUserData: userData for the socket
  *
- * \return: the websocket client descriptor or NULL in case of error
+ * \return: the websocket connection descriptor or NULL in case of error
  */
-void *websocketClient_open(struct websocket_client_init *wsInit, void *websocketUserData);
+struct websocket_connection_desc *websocketClient_open(struct websocket_client_init *wsInit, void *websocketUserData);
 
 /**
  * \brief: closes the given websocket
@@ -125,22 +135,23 @@ void *websocketClient_open(struct websocket_client_init *wsInit, void *websocket
  * \param *wsDesc: pointer to the websocket descriptor
  *
  */
-void websocketServer_close(void *wsDesc);
-
+void websocketServer_close(struct websocket_server_desc *wsDesc);
 
 /**
  * \brief closes a websocket client
  *
  * \param *wsClientDesc Pointer to the websocket client descriptor
  */
-void websocketClient_close(void *wsSessionDescriptor);
+void websocketClient_close(struct websocket_connection_desc *wsConnectionDesc);
 
 /**
- * \brief returns if the client is still connected
+ * \brief returns if the connection is still connected
+ *
+ * \param *wsConnectionDesc Pointer to the websocket connection descriptor
  *
  * \return true => connected else false
  */
-bool websocketClient_isConnected(void *wsSessionDescriptor);
+bool websocketConnection_isConnected(struct websocket_connection_desc *wsConnectionDesc);
 
 /**
  * \brief: increments the reference count of the given object
@@ -159,7 +170,7 @@ void websocket_unref(void *ptr);
 /**
  * \brief: sends binary or text data through websockets
  *
- * \param *wsSessionDescriptor: pointer to the websocket session descriptor
+ * \param *wsConnectionDescriptor: pointer to the websocket connection descriptor
  * \param dataType: the datatype (WS_DATA_TYPE_BINARY or WS_DATA_TYPE_TEXT)
  * \param *msg: the payload data
  * \param len: the payload length
@@ -167,21 +178,21 @@ void websocket_unref(void *ptr);
  * \return 0 if successful else -1
  *
  */
-int websocket_sendData(void *wsSessionDescriptor, enum ws_data_type dataType, const void *msg, size_t len);
+int websocket_sendData(struct websocket_connection_desc *wsConnectionDesc, enum ws_data_type dataType, const void *msg, size_t len);
 
 /**
- * \brief: closes the given websocket session
+ * \brief: closes the given websocket connection
  *
- * \param *wsSessionDesc: pointer to the websocket session descriptor
+ * \param *wsConnectionDesc: pointer to the websocket connection descriptor
  * \param code: the closing code
  */
-void websocket_closeSession(void *wsSessionDescriptor, enum ws_close_code code);
+void websocket_closeConnection(struct websocket_connection_desc *wsConnectionDesc, enum ws_close_code code);
 
 /**
  * \brief: sends fragmented binary or text data through websockets
  *         use websocket_sendDataFragmetedCont for further fragments
  *
- * \param *wsSessionDescriptor: pointer to the websocket session descriptor
+ * \param *wsConnectionDescriptor: pointer to the websocket connection descriptor
  * \param dataType: the datatype (WS_DATA_TYPE_BINARY or WS_DATA_TYPE_TEXT)
  * \param *msg: the payload data
  * \param len: the payload length
@@ -189,13 +200,13 @@ void websocket_closeSession(void *wsSessionDescriptor, enum ws_close_code code);
  * \return 0 if successful else -1
  *
  */
-int websocket_sendDataFragmentedStart(void *wsSessionDescriptor, enum ws_data_type dataType, const void *msg, size_t len);
-
+int websocket_sendDataFragmentedStart(struct websocket_connection_desc *wsConnectionDesc, enum ws_data_type dataType, const void *msg,
+                                      size_t len);
 /**
  * \brief: continues a fragmented send
  *         use sendDataFragmentedStop to stop the transmission
  *
- * \param *wsSessionDesc: pointer to the websocket session descriptor
+ * \param *wsConnectionDesc: pointer to the websocket connection descriptor
  * \param fin: true => this is the last fragment else false
  * \param *msg: the payload data
  * \param len: the payload length
@@ -203,33 +214,46 @@ int websocket_sendDataFragmentedStart(void *wsSessionDescriptor, enum ws_data_ty
  * \return 0 if successful else -1
  *
  */
-int websocket_sendDataFragmentedCont(void *wsSessionDescriptor, bool fin, const void *msg, size_t len);
+int websocket_sendDataFragmentedCont(struct websocket_connection_desc *wsConnectionDescriptor, bool fin, const void *msg, size_t len);
 
+/* ------------------------------ LEGACY FUNCTIONS ------------------------------ */
+
+/**
+ * \brief: opens a websocket server
+ *
+ * \param wsInit: pointer to the init struct
+ * \param websocketUserData: userData for the socket
+ *
+ * \return: the websocket descriptor or NULL in case of error
+ *
+ * \note LEGACY!!! This function is for backward compatibility
+ *       it should not be used anymore but will not be
+ *       removed unless there's a good reason
+ */
+void *websocket_open(struct websocket_init *wsInit, void *websocketUserData);
 
 /**
  * \brief: closes the given websocket server
  *
  * \param *wsDesc: pointer to the websocket descriptor
  *
- * \note this define is for backward compatibility
+ * \note LEGACY!!! This function is for backward compatibility
  *       it should not be used anymore but will not be
  *       removed unless there's a good reason
  */
-#define websocket_close(wsDesc) websocketServer_close(wsDesc)
+void websocket_close(void *wsDesc);
 
 /**
- * \brief: opens a websocket server
+ * \brief: returns the user data of the given client
  *
- * \param wsInit: pointer to the init struct
- * \param userData: userData for the socket
+ * \param *wsClientDesc: pointer to the websocket client descriptor
  *
- * \return: the websocket descriptor or NULL in case of error
- *
- * \note this define is for backward compatibility
+ * \note LEGACY!!! This function is for backward compatibility
  *       it should not be used anymore but will not be
  *       removed unless there's a good reason
  */
-#define websocket_open(wsInit, userData) websocketServer_open(wsInit, userData)
+void* websocket_getClientUserData(void *wsClientDesc);
+
 
 #ifdef __cplusplus
 }

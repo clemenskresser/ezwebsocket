@@ -55,7 +55,7 @@ void refcnt_ref(void *ptr)
 {
   struct ref_cnt_obj *ref;
 
-  ref = ptr - offsetof(struct ref_cnt_obj, data);
+  ref = (struct ref_cnt_obj*)(((unsigned char *)ptr) - offsetof(struct ref_cnt_obj, data));
   pthread_mutex_lock(&ref->lock);    //todo: use     atomic_fetch_add((int *)&ref->count, 1); in case of C11
   ref->cnt++;
   pthread_mutex_unlock(&ref->lock);
@@ -70,7 +70,7 @@ void refcnt_unref(void *ptr)
 {
   struct ref_cnt_obj *ref;
 
-  ref = ptr - offsetof(struct ref_cnt_obj, data);
+  ref = (struct ref_cnt_obj*)(((unsigned char*)ptr) - offsetof(struct ref_cnt_obj, data));
   pthread_mutex_lock(&ref->lock);    //todo: use     atomic_fetch_add((int *)&ref->count, 1); in case of C11
   if (ref->cnt >= 0)
     ref->cnt--;

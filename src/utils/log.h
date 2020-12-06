@@ -14,8 +14,8 @@
 void log_enableDebug (bool enabled);
 extern bool debugEnabled;
 
-#define log_err(FMT, ARGS...)      do { fprintf(stderr, "%s:%s: " FMT "\n", __FILE__, __FUNCTION__, ##ARGS); } while (0)
-#define log_dbg(FMT, ARGS...)      do { if (debugEnabled) {fprintf(stdout, "%s:%s: " FMT "\n", __FILE__, __FUNCTION__, ##ARGS);} } while (0)
+#define log_err(FMT, ...)      do { fprintf(stderr, "%s:%s: " FMT "\n", __FILE__, __func__, ##__VA_ARGS__); } while (0)
+#define log_dbg(FMT, ...)      do { if (debugEnabled) {fprintf(stdout, "%s:%s: " FMT "\n", __FILE__, __func__, ##__VA_ARGS__);} } while (0)
 
 
 #endif /* UTILS_LOG_H_ */

@@ -11,7 +11,6 @@
 #include <stddef.h>
 #include "utils/dyn_buffer.h"
 
-
 struct socket_client_init
 {
   //! callback that should be called when a message is received use NULL if not used

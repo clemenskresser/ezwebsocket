@@ -58,15 +58,20 @@ enum ws_type
     WS_TYPE_SERVER
 };
 
-struct websocket_desc
+struct websocket_server_desc
 {
   //! callback that is called when a message is received on the websocket
-  void (*ws_onMessage)(void *socketUserData, void *sessionDesc, void *sessionUserData, enum ws_data_type dataType,
-                       void *msg, size_t len);
+  void (*ws_onMessage)(void *websocketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData,
+                       enum ws_data_type dataType, void *msg, size_t len);
+  //! callback that is called when the websocket is connected (legacy version)
+  void* (*ws_onOpenLegacy)(struct websocket_server_desc *wsDesc, struct websocket_connection_desc *connectionDesc);
   //! callback that is called when the websocket is connected
-  void* (*ws_onOpen)(void *wsDesc, void *sessionDesc);
+  void* (*ws_onOpen)(void *websocketUserData, struct websocket_server_desc *wsDesc, struct websocket_connection_desc *connectionDesc);
+  //! callback that is called when the websocket is closed (legacy version)
+  void (*ws_onCloseLegacy)(void *websocketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData);
   //! callback that is called when the websocket is closed
-  void (*ws_onClose)(void *socketUserData, void *sessionDesc, void *sessionUserData);
+  void (*ws_onClose)(struct websocket_server_desc *wsDesc, void *websocketUserData, struct websocket_connection_desc *connectionDesc,
+                     void *userData);
   //! pointer to the socket descriptor
   void *socketDesc;
   //! pointer to the user data
@@ -89,7 +94,7 @@ struct last_message
   char *data;
 };
 
-struct websocket_session_desc
+struct websocket_connection_desc
 {
   //! indicates if it is a websocket client or a websocket server
   enum ws_type wsType;
@@ -99,8 +104,8 @@ struct websocket_session_desc
   volatile enum ws_state state;
   //! information about the last received message
   struct last_message lastMessage;
-  //! pointer to the session user data
-  void *sessionUserData;
+  //! pointer to the connection user data
+  void *connectionUserData;
   //! stores the time for message timeouts
   struct timespec timeout;
   union
@@ -108,25 +113,26 @@ struct websocket_session_desc
     //!pointer to the websocket client descriptor (in case of client mode)
     struct websocket_client_desc *wsClientDesc;
     //!pointer to the websocket server descriptor (in case of server mode)
-    struct websocket_desc *wsServerDesc;
+    struct websocket_server_desc *wsServerDesc;
   } wsDesc;
 };
 
 struct websocket_client_desc
 {
   //! callback that is called when a message is received on the websocket
-  void (*ws_onMessage)(void *socketUserData, void *sessionDesc, void *sessionUserData, enum ws_data_type dataType,
-                       void *msg, size_t len);
+  void (*ws_onMessage)(void *socketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData,
+                       enum ws_data_type dataType, void *msg, size_t len);
   //! callback that is called when the websocket is connected
-  void* (*ws_onOpen)(void *socketUserData, void *wsDesc, void *sessionDesc);
+  void* (*ws_onOpen)(void *socketUserData, struct websocket_client_desc *wsDesc,
+                     struct websocket_connection_desc *connectionDesc);
   //! callback that is called when the websocket is closed
-  void (*ws_onClose)(void *socketUserData, void *sessionDesc, void *sessionUserData);
+  void (*ws_onClose)(void *socketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData);
   //! pointer to the socket descriptor
   void *socketDesc;
   //! pointer to the user data
   void *wsUserData;
-  //! the websocket session descriptor for the current connection
-  struct websocket_session_desc session;
+  //! the websocket connection descriptor for the current connection
+  struct websocket_connection_desc connection;
   //! the address of the host
   char *address;
   //! the port of the websocket host
@@ -178,12 +184,12 @@ static char* calculateSecWebSocketAccept(const char *key)
  * \return: 0 if successful else -1
  *
  */
-static int parseHttpHeader(char *wsHeader, size_t len, char *key)
+static int parseHttpHeader(const char *wsHeader, size_t len, char *key)
 {
-  char *cpnt;
+  const char *cpnt;
   int i;
 
-  cpnt = strnstr(wsHeader, WS_HS_KEY_ID, len);
+  cpnt = strnstr((char*)wsHeader, WS_HS_KEY_ID, len);
   if(!cpnt)
   {
     log_err("%s() couldn't find key", __func__);
@@ -229,7 +235,7 @@ static int parseHttpHeader(char *wsHeader, size_t len, char *key)
  * \return: -1 on error 0 if successful
  *
  */
-static int sendWsHandshakeReply(void *socketClientDesc, char *replyKey)
+static int sendWsHandshakeReply(struct socket_connection_desc *socketClientDesc, const char *replyKey)
 {
   char replyHeader[strlen(WS_HANDSHAKE_REPLY_BLUEPRINT) + 28];
 
@@ -254,12 +260,12 @@ static int sendWsHandshakeReply(void *socketClientDesc, char *replyKey)
  *
  * \return true => handshake correct else false
  */
-static bool checkWsHandshakeReply(struct websocket_session_desc *wsSessionDesc, char *header, size_t *len)
+static bool checkWsHandshakeReply(struct websocket_connection_desc *wsConnectionDesc, char *header, size_t *len)
 {
-  if(wsSessionDesc->wsType == WS_TYPE_SERVER)
+  if(wsConnectionDesc->wsType == WS_TYPE_SERVER)
     return false;
 
-  struct websocket_client_desc *wsDesc = wsSessionDesc->wsDesc.wsClientDesc;
+  struct websocket_client_desc *wsDesc = wsConnectionDesc->wsDesc.wsClientDesc;
 
   char *cpnt;
   unsigned long i;
@@ -606,7 +612,7 @@ static void copyMasked(unsigned char *to, const unsigned char *from, unsigned lo
 /**
  * \brief: sends data through websockets with custom opcodes
  *
- * \param *wsSessionDesc: pointer to the websocket session descriptor
+ * \param *wsConnectionDesc: pointer to the websocket connection descriptor
  * \param opcode: the opcode to use
  * \param fin: true if this is the last frame of a sequence else false
  * \param masked: true => send masked (client to server) else false (server to client)
@@ -615,17 +621,16 @@ static void copyMasked(unsigned char *to, const unsigned char *from, unsigned lo
  *
  * \return 0 if successful else -1
  */
-static int sendDataLowLevel(void *wsSessionDesc, enum ws_opcode opcode, bool fin, bool masked, const void *msg,
+static int sendDataLowLevel(struct websocket_connection_desc *wsConnectionDesc, enum ws_opcode opcode, bool fin, bool masked, const void *msg,
                             size_t len)
 {
-  struct websocket_session_desc *websockSessionDesc = wsSessionDesc;
   unsigned char header[14];  //the maximum size of a websocket header is 14
   int headerLength;
   unsigned char *sendBuffer;
   int rc = -1;
   unsigned long mask = 0;
 
-  if(websockSessionDesc->state == WS_STATE_CLOSED)
+  if(wsConnectionDesc->state == WS_STATE_CLOSED)
     return -1;
 
   if(masked)
@@ -649,14 +654,14 @@ static int sendDataLowLevel(void *wsSessionDesc, enum ws_opcode opcode, bool fin
       memcpy(&sendBuffer[headerLength], msg, len);
   }
 
-  switch(websockSessionDesc->wsType)
+  switch(wsConnectionDesc->wsType)
   {
     case WS_TYPE_SERVER:
-      rc = socketServer_send(websockSessionDesc->socketClientDesc, sendBuffer, len + headerLength);
+      rc = socketServer_send(wsConnectionDesc->socketClientDesc, sendBuffer, len + headerLength);
       break;
 
     case WS_TYPE_CLIENT:
-      rc = socketClient_send(websockSessionDesc->wsDesc.wsClientDesc->socketDesc, sendBuffer, len + headerLength);
+      rc = socketClient_send(wsConnectionDesc->wsDesc.wsClientDesc->socketDesc, sendBuffer, len + headerLength);
       break;
   }
   free(sendBuffer);
@@ -713,37 +718,37 @@ enum ws_msg_state
 /**
  * \brief: handles the first message (which is sometimes followed by a cont message)
  *
- * \param *wsSessionDesc: pointer to the websocket session descriptor
+ * \param *wsConnectionDesc: pointer to the websocket connection descriptor
  * \param *data: pointer to the payload data
  * \param *header: pointer to the parsed websocket header structure
  *
  * \return: the message state
  */
-static enum ws_msg_state handleFirstMessage(struct websocket_session_desc *wsSessionDesc, const unsigned char *data,
+static enum ws_msg_state handleFirstMessage(struct websocket_connection_desc *wsConnectionDesc, const unsigned char *data,
                                             struct ws_header *header)
 {
   size_t i;
 
-  if(!header->masked && (wsSessionDesc->wsType == WS_TYPE_SERVER))
+  if(!header->masked && (wsConnectionDesc->wsType == WS_TYPE_SERVER))
   {
-    websocket_closeSession(wsSessionDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
+    websocket_closeConnection(wsConnectionDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
     return WS_MSG_STATE_ERROR;
   }
 
-  if(wsSessionDesc->lastMessage.data != NULL)
+  if(wsConnectionDesc->lastMessage.data != NULL)
   {
     log_err("last message not finished");
-    websocket_closeSession(wsSessionDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
+    websocket_closeConnection(wsConnectionDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
     return WS_MSG_STATE_ERROR;
   }
 
   if(header->payloadLength) //it's allowed to send frames with payload length = 0
   {
     if(header->fin)
-      wsSessionDesc->lastMessage.data = refcnt_allocate(header->payloadLength, NULL);
+      wsConnectionDesc->lastMessage.data = refcnt_allocate(header->payloadLength, NULL);
     else
-      wsSessionDesc->lastMessage.data = malloc(header->payloadLength);
-    if(!wsSessionDesc->lastMessage.data)
+      wsConnectionDesc->lastMessage.data = malloc(header->payloadLength);
+    if(!wsConnectionDesc->lastMessage.data)
     {
       log_err("refcnt_allocate failed dropping message");
       return WS_MSG_STATE_ERROR;
@@ -753,31 +758,31 @@ static enum ws_msg_state handleFirstMessage(struct websocket_session_desc *wsSes
     {
       for(i = 0; i < header->payloadLength; i++)
       {
-        wsSessionDesc->lastMessage.data[i] = data[header->payloadStartOffset + i] ^ header->mask[i % 4];
+        wsConnectionDesc->lastMessage.data[i] = data[header->payloadStartOffset + i] ^ header->mask[i % 4];
       }
     }
     else
     {
-      memcpy(wsSessionDesc->lastMessage.data, &data[header->payloadStartOffset], header->payloadLength);
+      memcpy(wsConnectionDesc->lastMessage.data, &data[header->payloadStartOffset], header->payloadLength);
     }
   }
 
-  wsSessionDesc->lastMessage.firstReceived = true;
-  wsSessionDesc->lastMessage.complete = header->fin;
-  wsSessionDesc->lastMessage.dataType = header->opcode == WS_OPCODE_TEXT ? WS_DATA_TYPE_TEXT : WS_DATA_TYPE_BINARY;
+  wsConnectionDesc->lastMessage.firstReceived = true;
+  wsConnectionDesc->lastMessage.complete = header->fin;
+  wsConnectionDesc->lastMessage.dataType = header->opcode == WS_OPCODE_TEXT ? WS_DATA_TYPE_TEXT : WS_DATA_TYPE_BINARY;
 
-  wsSessionDesc->lastMessage.len = header->payloadLength;
-  if(wsSessionDesc->lastMessage.dataType == WS_DATA_TYPE_TEXT)
+  wsConnectionDesc->lastMessage.len = header->payloadLength;
+  if(wsConnectionDesc->lastMessage.dataType == WS_DATA_TYPE_TEXT)
   {
     enum utf8_state state;
 
-    wsSessionDesc->lastMessage.utf8Handle = 0;
-    state = utf8_validate(wsSessionDesc->lastMessage.data, wsSessionDesc->lastMessage.len,
-        &wsSessionDesc->lastMessage.utf8Handle);
+    wsConnectionDesc->lastMessage.utf8Handle = 0;
+    state = utf8_validate(wsConnectionDesc->lastMessage.data, wsConnectionDesc->lastMessage.len,
+        &wsConnectionDesc->lastMessage.utf8Handle);
     if((header->fin && (state != UTF8_STATE_OK)) || (!header->fin && (state == UTF8_STATE_FAIL)))
     {
       log_err("no valid utf8 string closing connection");
-      websocket_closeSession(wsSessionDesc, WS_CLOSE_CODE_INVALID_DATA);
+      websocket_closeConnection(wsConnectionDesc, WS_CLOSE_CODE_INVALID_DATA);
       return WS_MSG_STATE_ERROR;
     }
   }
@@ -790,90 +795,90 @@ static enum ws_msg_state handleFirstMessage(struct websocket_session_desc *wsSes
 /**
  * \brief: handles a cont message
  *
- * \param *wsSessionDesc: pointer to the websocket session descriptor
+ * \param *wsConnectionDesc: pointer to the websocket connection descriptor
  * \param *data: pointer to the payload data
  * \param *header: pointer to the parsed websocket header structure
  *
  * \return: the message state
  */
-static enum ws_msg_state handleContMessage(struct websocket_session_desc *wsSessionDesc, const unsigned char *data,
+static enum ws_msg_state handleContMessage(struct websocket_connection_desc *wsConnectionDesc, const unsigned char *data,
                                            struct ws_header *header)
 {
   size_t i;
   char *temp;
 
-  if(!wsSessionDesc->lastMessage.firstReceived)
+  if(!wsConnectionDesc->lastMessage.firstReceived)
   {
     log_err("missing last message closing connection");
-    websocket_closeSession(wsSessionDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
+    websocket_closeConnection(wsConnectionDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
     return WS_MSG_STATE_ERROR;
   }
 
-  if((wsSessionDesc->wsType != WS_TYPE_SERVER) == header->masked)
+  if((wsConnectionDesc->wsType != WS_TYPE_SERVER) == header->masked)
   {
     log_err("mask bit wrong");
-    websocket_closeSession(wsSessionDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
+    websocket_closeConnection(wsConnectionDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
     return WS_MSG_STATE_ERROR;
   }
 
-  if(wsSessionDesc->lastMessage.len + header->payloadLength) //it's allowed to send frames with payload length = 0
+  if(wsConnectionDesc->lastMessage.len + header->payloadLength) //it's allowed to send frames with payload length = 0
   {
     if(header->fin)
     {
-      temp = refcnt_allocate(wsSessionDesc->lastMessage.len + header->payloadLength, NULL);
+      temp = refcnt_allocate(wsConnectionDesc->lastMessage.len + header->payloadLength, NULL);
       if(!temp)
       {
         log_err("refcnt_allocate failed dropping message");
-        free(wsSessionDesc->lastMessage.data);
-        wsSessionDesc->lastMessage.data = NULL;
+        free(wsConnectionDesc->lastMessage.data);
+        wsConnectionDesc->lastMessage.data = NULL;
         return WS_MSG_STATE_ERROR;
       }
-      memcpy(temp, wsSessionDesc->lastMessage.data, wsSessionDesc->lastMessage.len);
-      free(wsSessionDesc->lastMessage.data);
-      wsSessionDesc->lastMessage.data = temp;
+      memcpy(temp, wsConnectionDesc->lastMessage.data, wsConnectionDesc->lastMessage.len);
+      free(wsConnectionDesc->lastMessage.data);
+      wsConnectionDesc->lastMessage.data = temp;
     }
     else
     {
-      temp = realloc(wsSessionDesc->lastMessage.data, wsSessionDesc->lastMessage.len + header->payloadLength);
+      temp = realloc(wsConnectionDesc->lastMessage.data, wsConnectionDesc->lastMessage.len + header->payloadLength);
       if(!temp)
       {
         log_err("realloc failed dropping message");
-        free(wsSessionDesc->lastMessage.data);
-        wsSessionDesc->lastMessage.data = NULL;
+        free(wsConnectionDesc->lastMessage.data);
+        wsConnectionDesc->lastMessage.data = NULL;
         return WS_MSG_STATE_ERROR;
       }
-      wsSessionDesc->lastMessage.data = temp;
+      wsConnectionDesc->lastMessage.data = temp;
     }
 
     if(header->masked)
     {
       for(i = 0; i < header->payloadLength; i++)
       {
-        wsSessionDesc->lastMessage.data[wsSessionDesc->lastMessage.len + i] = data[header->payloadStartOffset + i]
+        wsConnectionDesc->lastMessage.data[wsConnectionDesc->lastMessage.len + i] = data[header->payloadStartOffset + i]
             ^ header->mask[i % 4];
       }
     }
     else
     {
-      memcpy(&wsSessionDesc->lastMessage.data[wsSessionDesc->lastMessage.len], &data[header->payloadStartOffset],
+      memcpy(&wsConnectionDesc->lastMessage.data[wsConnectionDesc->lastMessage.len], &data[header->payloadStartOffset],
           header->payloadLength);
     }
   }
-  wsSessionDesc->lastMessage.complete = header->fin;
+  wsConnectionDesc->lastMessage.complete = header->fin;
 
-  if(wsSessionDesc->lastMessage.dataType == WS_DATA_TYPE_TEXT)
+  if(wsConnectionDesc->lastMessage.dataType == WS_DATA_TYPE_TEXT)
   {
     enum utf8_state state;
-    state = utf8_validate(&wsSessionDesc->lastMessage.data[wsSessionDesc->lastMessage.len], header->payloadLength,
-        &wsSessionDesc->lastMessage.utf8Handle);
+    state = utf8_validate(&wsConnectionDesc->lastMessage.data[wsConnectionDesc->lastMessage.len], header->payloadLength,
+        &wsConnectionDesc->lastMessage.utf8Handle);
     if((header->fin && state != UTF8_STATE_OK) || (!header->fin && state == UTF8_STATE_FAIL))
     {
       log_err("no valid utf8 string closing connection");
-      websocket_closeSession(wsSessionDesc, WS_CLOSE_CODE_INVALID_DATA);
+      websocket_closeConnection(wsConnectionDesc, WS_CLOSE_CODE_INVALID_DATA);
       return WS_MSG_STATE_ERROR;
     }
   }
-  wsSessionDesc->lastMessage.len += header->payloadLength;
+  wsConnectionDesc->lastMessage.len += header->payloadLength;
 
   if(header->fin)
     return WS_MSG_STATE_USER_DATA;
@@ -884,25 +889,25 @@ static enum ws_msg_state handleContMessage(struct websocket_session_desc *wsSess
 /**
  * \brief: handles a ping message and replies with a pong message
  *
- * \param *wsSessionDesc: pointer to the websocket client descriptor
+ * \param *wsConnectionDesc: pointer to the websocket client descriptor
  * \param *data: pointer to the payload data
  * \param *header: pointer to the parsed websocket header structure
  *
  * \return: the message state
  */
-static enum ws_msg_state handlePingMessage(struct websocket_session_desc *wsSessionDesc, const unsigned char *data,
+static enum ws_msg_state handlePingMessage(struct websocket_connection_desc *wsConnectionDesc, const unsigned char *data,
                                            struct ws_header *header)
 {
   int rc;
   char *temp;
   size_t i;
-  bool masked = (wsSessionDesc->wsType == WS_TYPE_CLIENT);
+  bool masked = (wsConnectionDesc->wsType == WS_TYPE_CLIENT);
 
   if(header->fin)
   {
     if(header->payloadLength > MAX_DEFAULT_PAYLOAD_LENGTH)
     {
-      websocket_closeSession(wsSessionDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
+      websocket_closeConnection(wsConnectionDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
       return WS_MSG_STATE_NO_USER_DATA;
     }
     else if(header->masked)
@@ -924,7 +929,7 @@ static enum ws_msg_state handlePingMessage(struct websocket_session_desc *wsSess
       else
         temp = NULL;
 
-      if(sendDataLowLevel(wsSessionDesc, WS_OPCODE_PONG, true, masked, temp, header->payloadLength) == 0)
+      if(sendDataLowLevel(wsConnectionDesc, WS_OPCODE_PONG, true, masked, temp, header->payloadLength) == 0)
         rc = WS_MSG_STATE_NO_USER_DATA;
       else
         rc = WS_MSG_STATE_ERROR;
@@ -933,7 +938,7 @@ static enum ws_msg_state handlePingMessage(struct websocket_session_desc *wsSess
     }
     else
     {
-      if(sendDataLowLevel(wsSessionDesc, WS_OPCODE_PONG, true, masked, &data[header->payloadStartOffset],
+      if(sendDataLowLevel(wsConnectionDesc, WS_OPCODE_PONG, true, masked, &data[header->payloadStartOffset],
           header->payloadLength) == 0)
         return WS_MSG_STATE_NO_USER_DATA;
       else
@@ -942,7 +947,7 @@ static enum ws_msg_state handlePingMessage(struct websocket_session_desc *wsSess
   }
   else
   {
-    websocket_closeSession(wsSessionDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
+    websocket_closeConnection(wsConnectionDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
     return WS_MSG_STATE_ERROR;
   }
 }
@@ -956,7 +961,7 @@ static enum ws_msg_state handlePingMessage(struct websocket_session_desc *wsSess
  *
  * \return: the message state
  */
-static enum ws_msg_state handlePongMessage(struct websocket_session_desc *wsClientDesc, const unsigned char *data,
+static enum ws_msg_state handlePongMessage(struct websocket_connection_desc *wsClientDesc, const unsigned char *data,
                                            struct ws_header *header)
 {
   (void) data;
@@ -968,7 +973,7 @@ static enum ws_msg_state handlePongMessage(struct websocket_session_desc *wsClie
   }
   else
   {
-    websocket_closeSession(wsClientDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
+    websocket_closeConnection(wsClientDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
     return WS_MSG_STATE_ERROR;
   }
 }
@@ -982,13 +987,13 @@ static enum ws_msg_state handlePongMessage(struct websocket_session_desc *wsClie
  *
  * \return: the message state
  */
-static enum ws_msg_state handleDisconnectMessage(struct websocket_session_desc *wsSessionDesc,
+static enum ws_msg_state handleDisconnectMessage(struct websocket_connection_desc *wsConnectionDesc,
                                                  const unsigned char *data, struct ws_header *header)
 {
   size_t i;
   int rc;
   unsigned long utf8Handle = 0;
-  bool masked = (wsSessionDesc->wsType == WS_TYPE_CLIENT);
+  bool masked = (wsConnectionDesc->wsType == WS_TYPE_CLIENT);
 
   if((header->fin) && (header->payloadLength != 1) && (header->payloadLength <= MAX_DEFAULT_PAYLOAD_LENGTH))
   {
@@ -996,10 +1001,10 @@ static enum ws_msg_state handleDisconnectMessage(struct websocket_session_desc *
 
     if(!header->payloadLength)
     {
-      websocket_closeSession(wsSessionDesc, WS_CLOSE_CODE_NORMAL);
+      websocket_closeConnection(wsConnectionDesc, WS_CLOSE_CODE_NORMAL);
       return WS_MSG_STATE_NO_USER_DATA;
     }
-    else if(header->masked == (wsSessionDesc->wsType == WS_TYPE_SERVER))
+    else if(header->masked == (wsConnectionDesc->wsType == WS_TYPE_SERVER))
     {
       char tempBuffer[MAX_DEFAULT_PAYLOAD_LENGTH];
 
@@ -1018,18 +1023,18 @@ static enum ws_msg_state handleDisconnectMessage(struct websocket_session_desc *
       code = (((unsigned char)tempBuffer[0]) << 8) | ((unsigned char)tempBuffer[1]);
       if(checkCloseCode(code) == false)
       {
-        websocket_closeSession(wsSessionDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
+        websocket_closeConnection(wsConnectionDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
         return WS_MSG_STATE_ERROR;
       }
       else if((header->payloadLength == 2)
           || (UTF8_STATE_OK == utf8_validate(&tempBuffer[2], header->payloadLength - 2, &utf8Handle)))
       {
-        websocket_closeSession(wsSessionDesc, WS_CLOSE_CODE_NORMAL);
+        websocket_closeConnection(wsConnectionDesc, WS_CLOSE_CODE_NORMAL);
         return WS_MSG_STATE_NO_USER_DATA;
       }
       else
       {
-        websocket_closeSession(wsSessionDesc, WS_CLOSE_CODE_INVALID_DATA);
+        websocket_closeConnection(wsConnectionDesc, WS_CLOSE_CODE_INVALID_DATA);
         return WS_MSG_STATE_ERROR;
       }
     }
@@ -1038,25 +1043,25 @@ static enum ws_msg_state handleDisconnectMessage(struct websocket_session_desc *
       if((header->payloadLength == 2)
           || utf8_validate((char*)&data[header->payloadStartOffset + 2], header->payloadLength - 2, &utf8Handle))
       {
-        if(sendDataLowLevel(wsSessionDesc, WS_OPCODE_DISCONNECT, true, masked, &data[header->payloadStartOffset],
+        if(sendDataLowLevel(wsConnectionDesc, WS_OPCODE_DISCONNECT, true, masked, &data[header->payloadStartOffset],
             header->payloadLength) == 0)
           rc = WS_MSG_STATE_NO_USER_DATA;
         else
           rc = WS_MSG_STATE_ERROR;
-        switch(wsSessionDesc->wsType)
+        switch(wsConnectionDesc->wsType)
         {
           case WS_TYPE_SERVER:
-            socketServer_closeClient(wsSessionDesc->socketClientDesc);
+            socketServer_closeConnection(wsConnectionDesc->socketClientDesc);
             break;
 
           case WS_TYPE_CLIENT:
-            socketClient_closeConnection(wsSessionDesc->wsDesc.wsClientDesc->socketDesc);
+            socketClient_closeConnection(wsConnectionDesc->wsDesc.wsClientDesc->socketDesc);
             break;
         }
       }
       else
       {
-        websocket_closeSession(wsSessionDesc, WS_CLOSE_CODE_INVALID_DATA);
+        websocket_closeConnection(wsConnectionDesc, WS_CLOSE_CODE_INVALID_DATA);
         rc = WS_MSG_STATE_ERROR;
       }
       return rc;
@@ -1064,7 +1069,7 @@ static enum ws_msg_state handleDisconnectMessage(struct websocket_session_desc *
   }
   else
   {
-    websocket_closeSession(wsSessionDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
+    websocket_closeConnection(wsConnectionDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
     return WS_MSG_STATE_ERROR;
   }
 }
@@ -1072,14 +1077,14 @@ static enum ws_msg_state handleDisconnectMessage(struct websocket_session_desc *
 /**
  * \brief: parses a message and stores it to the client descriptor
  *
- * \param *wsSessionDesc: pointer to the websocket session descriptor
+ * \param *wsConnectionDesc: pointer to the websocket connection descriptor
  * \param *data: pointer to the received data
  * \param len: the length of the data
  * \param header: the parsed header struct (as parsed by parseWebsocketHeader)
  *
  * \return one of ws_msg_state
  */
-static enum ws_msg_state parseMessage(struct websocket_session_desc *wsSessionDesc, const unsigned char *data,
+static enum ws_msg_state parseMessage(struct websocket_connection_desc *wsConnectionDesc, const unsigned char *data,
                                       size_t len, struct ws_header *header)
 {
   enum ws_msg_state rc;
@@ -1095,19 +1100,19 @@ static enum ws_msg_state parseMessage(struct websocket_session_desc *wsSessionDe
   {
     case WS_OPCODE_TEXT:
     case WS_OPCODE_BINARY:
-      return handleFirstMessage(wsSessionDesc, data, header);
+      return handleFirstMessage(wsConnectionDesc, data, header);
 
     case WS_OPCODE_CONTINUATION:
-      return handleContMessage(wsSessionDesc, data, header);
+      return handleContMessage(wsConnectionDesc, data, header);
 
     case WS_OPCODE_PING:
-      return handlePingMessage(wsSessionDesc, data, header);
+      return handlePingMessage(wsConnectionDesc, data, header);
 
     case WS_OPCODE_PONG:
-      return handlePongMessage(wsSessionDesc, data, header);
+      return handlePongMessage(wsConnectionDesc, data, header);
 
     case WS_OPCODE_DISCONNECT:
-      return handleDisconnectMessage(wsSessionDesc, data, header);
+      return handleDisconnectMessage(wsConnectionDesc, data, header);
 
     default:
       log_err("unknown opcode (%d)", header->opcode);
@@ -1123,14 +1128,14 @@ static enum ws_msg_state parseMessage(struct websocket_session_desc *wsSessionDe
  *         allocates and initialises the wsClientDesc
  *
  * \param *socketUserData: in this case this is the websocket descriptor
- * \param *socketClientDesc: the client descriptor from the socket server
+ * \param *socketSesionDesc: the client descriptor from the socket server
  *
- * \return: pointer to the websocket session descriptor
+ * \return: pointer to the websocket connection descriptor
  */
-static void* websocket_onOpen(void *socketUserData, void *socketClientDesc)
+static void* websocketServer_onOpen(void *socketUserData, struct socket_connection_desc *socketSesionDesc)
 {
-  struct websocket_desc *wsDesc = socketUserData;
-  struct websocket_session_desc *wsSessionDesc;
+  struct websocket_server_desc *wsDesc = socketUserData;
+  struct websocket_connection_desc *wsConnectionDesc;
 
   if(wsDesc == NULL)
   {
@@ -1138,28 +1143,32 @@ static void* websocket_onOpen(void *socketUserData, void *socketClientDesc)
     return NULL;
   }
 
-  if(socketClientDesc == NULL)
+  if(socketSesionDesc == NULL)
   {
     log_err("%s(): socketClientDesc must not be NULL!", __func__);
     return NULL;
   }
 
-  refcnt_ref(socketClientDesc);
-  wsSessionDesc = refcnt_allocate(sizeof(struct websocket_session_desc), NULL);
-  wsSessionDesc->wsType = WS_TYPE_SERVER;
-  wsSessionDesc->socketClientDesc = socketClientDesc;
-  wsSessionDesc->state = WS_STATE_HANDSHAKE;
-  wsSessionDesc->timeout.tv_nsec = 0;
-  wsSessionDesc->timeout.tv_sec = 0;
-  wsSessionDesc->lastMessage.data = NULL;
-  wsSessionDesc->lastMessage.len = 0;
-  wsSessionDesc->lastMessage.complete = false;
-  wsSessionDesc->wsDesc.wsServerDesc = wsDesc;
+  refcnt_ref(socketSesionDesc);
+  wsConnectionDesc = refcnt_allocate(sizeof(struct websocket_connection_desc), NULL);
+  wsConnectionDesc->wsType = WS_TYPE_SERVER;
+  wsConnectionDesc->socketClientDesc = socketSesionDesc;
+  wsConnectionDesc->state = WS_STATE_HANDSHAKE;
+  wsConnectionDesc->timeout.tv_nsec = 0;
+  wsConnectionDesc->timeout.tv_sec = 0;
+  wsConnectionDesc->lastMessage.firstReceived = false;
+  wsConnectionDesc->lastMessage.data = NULL;
+  wsConnectionDesc->lastMessage.len = 0;
+  wsConnectionDesc->lastMessage.complete = false;
+  wsConnectionDesc->wsDesc.wsServerDesc = wsDesc;
 
-  if(wsDesc->ws_onOpen)
-    wsSessionDesc->sessionUserData = wsDesc->ws_onOpen(wsDesc, wsSessionDesc);
+  if(wsDesc->ws_onOpen != NULL)
+    wsConnectionDesc->connectionUserData = wsDesc->ws_onOpen(wsDesc->wsSocketUserData, wsDesc, wsConnectionDesc);
 
-  return wsSessionDesc;
+  if(wsDesc->ws_onOpenLegacy != NULL)
+    wsConnectionDesc->connectionUserData = wsDesc->ws_onOpenLegacy(wsDesc, wsConnectionDesc);
+
+  return wsConnectionDesc;
 }
 
 /**
@@ -1174,40 +1183,48 @@ static void* websocketClient_onOpen(void *socketUserData, void *socketDesc)
   struct websocket_client_desc *wsDesc = socketUserData;
   (void)socketDesc;
 
-  if(wsDesc->ws_onOpen)
-    wsDesc->session.sessionUserData = wsDesc->ws_onOpen( wsDesc->wsUserData, wsDesc, &wsDesc->session);
+  if(wsDesc->ws_onOpen != NULL)
+    wsDesc->connection.connectionUserData = wsDesc->ws_onOpen( wsDesc->wsUserData, wsDesc, &wsDesc->connection);
   else
-    wsDesc->session.sessionUserData = NULL;
+    wsDesc->connection.connectionUserData = NULL;
 
   if(!sendWsHandshakeRequest(wsDesc))
   {
     if(wsDesc->ws_onClose != NULL)
-      wsDesc->ws_onClose(wsDesc->wsUserData, &wsDesc->session, wsDesc->session.sessionUserData);
-    wsDesc->session.state = WS_STATE_CLOSED;
+      wsDesc->ws_onClose(wsDesc->wsUserData, &wsDesc->connection, wsDesc->connection.connectionUserData);
+    wsDesc->connection.state = WS_STATE_CLOSED;
   }
 
-  return &wsDesc->session;
+  return &wsDesc->connection;
 }
 
 /**
  * \brief gets called when the websocket is closed
  *
- * \param *wsSessionDesc pointer to the websocket session descriptor
+ * \param *wsConnectionDesc pointer to the websocket connection descriptor
  */
-static void callOnClose(struct websocket_session_desc *wsSessionDesc)
+static void callOnClose(struct websocket_connection_desc *wsConnectionDesc)
 {
-  switch(wsSessionDesc->wsType)
+  switch(wsConnectionDesc->wsType)
   {
     case WS_TYPE_SERVER:
-      if(wsSessionDesc->wsDesc.wsServerDesc->ws_onClose != NULL)
-        wsSessionDesc->wsDesc.wsServerDesc->ws_onClose(wsSessionDesc->wsDesc.wsServerDesc->wsSocketUserData,
-            wsSessionDesc, wsSessionDesc->sessionUserData);
+      if(wsConnectionDesc->wsDesc.wsServerDesc->ws_onClose != NULL)
+      {
+        wsConnectionDesc->wsDesc.wsServerDesc->ws_onClose(wsConnectionDesc->wsDesc.wsServerDesc,
+            wsConnectionDesc->wsDesc.wsServerDesc->wsSocketUserData, wsConnectionDesc,
+            wsConnectionDesc->connectionUserData);
+      }
+      else if(wsConnectionDesc->wsDesc.wsServerDesc->ws_onCloseLegacy != NULL)
+      {
+        wsConnectionDesc->wsDesc.wsServerDesc->ws_onCloseLegacy(wsConnectionDesc->wsDesc.wsServerDesc->wsSocketUserData,
+            wsConnectionDesc, wsConnectionDesc->connectionUserData);
+      }
       break;
 
     case WS_TYPE_CLIENT:
-      if(wsSessionDesc->wsDesc.wsClientDesc->ws_onClose != NULL)
-        wsSessionDesc->wsDesc.wsClientDesc->ws_onClose(wsSessionDesc->wsDesc.wsClientDesc->wsUserData, wsSessionDesc,
-            wsSessionDesc->sessionUserData);
+      if(wsConnectionDesc->wsDesc.wsClientDesc->ws_onClose != NULL)
+        wsConnectionDesc->wsDesc.wsClientDesc->ws_onClose(wsConnectionDesc->wsDesc.wsClientDesc->wsUserData, wsConnectionDesc,
+            wsConnectionDesc->connectionUserData);
       break;
   }
 }
@@ -1218,14 +1235,14 @@ static void callOnClose(struct websocket_session_desc *wsSessionDesc)
  *
  * \param *socketUserData: in this case this is the websocket descriptor
  * \param *socketClientDesc: the client descriptor from the socket server
- * \param *sessionDescriptor: in this case this is the websocket session descriptor
+ * \param *connectionDescriptor: in this case this is the websocket connection descriptor
  *
  */
-static void websocket_onClose(void *socketUserData, void *socketClientDesc, void *sessionDescriptor)
+static void websocket_onClose(void *socketUserData, void *socketConnectionDesc, void *connectionDescriptor)
 {
   struct websocket_desc *wsDesc = socketUserData;
-  struct websocket_session_desc *wsSessionDesc = sessionDescriptor;
-  (void)socketClientDesc;
+  struct websocket_connection_desc *wsConnectionDesc = connectionDescriptor;
+  (void)socketConnectionDesc;
 
   if(wsDesc == NULL)
   {
@@ -1233,61 +1250,61 @@ static void websocket_onClose(void *socketUserData, void *socketClientDesc, void
     return;
   }
 
-  if(wsSessionDesc == NULL)
+  if(wsConnectionDesc == NULL)
   {
-    log_err("%s(): wsSessionDesc must not be NULL!", __func__);
+    log_err("%s(): wsConnectionDesc must not be NULL!", __func__);
     return;
   }
 
-  if(wsSessionDesc->lastMessage.data && wsSessionDesc->lastMessage.complete)
-    refcnt_unref(wsSessionDesc->lastMessage.data);
+  if(wsConnectionDesc->lastMessage.data && wsConnectionDesc->lastMessage.complete)
+    refcnt_unref(wsConnectionDesc->lastMessage.data);
   else
-    free(wsSessionDesc->lastMessage.data);
-  wsSessionDesc->lastMessage.data = NULL;
+    free(wsConnectionDesc->lastMessage.data);
+  wsConnectionDesc->lastMessage.data = NULL;
 
-  if(wsSessionDesc->state != WS_STATE_CLOSED)
+  if(wsConnectionDesc->state != WS_STATE_CLOSED)
   {
-    wsSessionDesc->state = WS_STATE_CLOSED;
+    wsConnectionDesc->state = WS_STATE_CLOSED;
 
-    callOnClose(wsSessionDesc);
+    callOnClose(wsConnectionDesc);
   }
 
-  if(wsSessionDesc->wsType == WS_TYPE_SERVER) //in client mode the session descriptor is not allocated
+  if(wsConnectionDesc->wsType == WS_TYPE_SERVER) //in client mode the connection descriptor is not allocated
   {
-    if(wsSessionDesc->socketClientDesc)
-      refcnt_unref(wsSessionDesc->socketClientDesc);
-    wsSessionDesc->socketClientDesc = NULL;
-    refcnt_unref(wsSessionDesc);
+    if(wsConnectionDesc->socketClientDesc)
+      refcnt_unref(wsConnectionDesc->socketClientDesc);
+    wsConnectionDesc->socketClientDesc = NULL;
+    refcnt_unref(wsConnectionDesc);
   }
 }
 
 /**
  * \brief gets called when a message was received on the websocket
  *
- * \param *wsSessionDesc pointer to the websocket session descriptor
+ * \param *wsConnectionDesc pointer to the websocket connection descriptor
  */
-static void callOnMessage(struct websocket_session_desc *wsSessionDesc)
+static void callOnMessage(struct websocket_connection_desc *wsConnectionDesc)
 {
-  switch(wsSessionDesc->wsType)
+  switch(wsConnectionDesc->wsType)
   {
     case WS_TYPE_SERVER:
     {
-      if(wsSessionDesc->wsDesc.wsServerDesc->ws_onMessage)
+      if(wsConnectionDesc->wsDesc.wsServerDesc->ws_onMessage)
       {
-        wsSessionDesc->wsDesc.wsServerDesc->ws_onMessage(wsSessionDesc->wsDesc.wsServerDesc->wsSocketUserData,
-            wsSessionDesc, wsSessionDesc->sessionUserData, wsSessionDesc->lastMessage.dataType,
-            wsSessionDesc->lastMessage.data, wsSessionDesc->lastMessage.len);
+        wsConnectionDesc->wsDesc.wsServerDesc->ws_onMessage(wsConnectionDesc->wsDesc.wsServerDesc->wsSocketUserData,
+            wsConnectionDesc, wsConnectionDesc->connectionUserData, wsConnectionDesc->lastMessage.dataType,
+            wsConnectionDesc->lastMessage.data, wsConnectionDesc->lastMessage.len);
       }
     }
       break;
 
     case WS_TYPE_CLIENT:
     {
-      if(wsSessionDesc->wsDesc.wsClientDesc->ws_onMessage)
+      if(wsConnectionDesc->wsDesc.wsClientDesc->ws_onMessage)
       {
-        wsSessionDesc->wsDesc.wsClientDesc->ws_onMessage(wsSessionDesc->wsDesc.wsServerDesc->wsSocketUserData,
-            wsSessionDesc, wsSessionDesc->sessionUserData, wsSessionDesc->lastMessage.dataType,
-            wsSessionDesc->lastMessage.data, wsSessionDesc->lastMessage.len);
+        wsConnectionDesc->wsDesc.wsClientDesc->ws_onMessage(wsConnectionDesc->wsDesc.wsServerDesc->wsSocketUserData,
+            wsConnectionDesc, wsConnectionDesc->connectionUserData, wsConnectionDesc->lastMessage.dataType,
+            wsConnectionDesc->lastMessage.data, wsConnectionDesc->lastMessage.len);
       }
     }
       break;
@@ -1298,18 +1315,18 @@ static void callOnMessage(struct websocket_session_desc *wsSessionDesc)
  * \brief: function that gets called when a message arrives at the socket server
  *
  * \param *socketUserData: in this case this is the websocket descriptor
- * \param *socketClientDesc: the client descriptor from the socket server
- * \param *sessionDescriptor: in this case this is the websocket session descriptor
+ * \param *socketConnectionDesc: the descriptor of the underlying socket
+ * \param *connectionDescriptor: in this case this is the websocket connection descriptor
  * \param *msg: pointer to the buffer containing the data
  * \param len: the length of msg
  *
  * \return: the amount of bytes read
  *
  */
-static size_t websocket_onMessage(void *socketUserData, void *socketClientDesc, void *sessionDescriptor, void *msg, size_t len)
+static size_t websocket_onMessage(void *socketUserData, void *socketConnectionDesc, void *connectionDescriptor, void *msg, size_t len)
 {
   struct websocket_desc *wsDesc = socketUserData;
-  struct websocket_session_desc *wsSessionDesc = sessionDescriptor;
+  struct websocket_connection_desc *wsConnectionDesc = connectionDescriptor;
   struct ws_header wsHeader = {0};
   struct timespec now;
 
@@ -1322,22 +1339,22 @@ static size_t websocket_onMessage(void *socketUserData, void *socketClientDesc, 
     return 0;
   }
 
-  if(wsSessionDesc == NULL)
+  if(wsConnectionDesc == NULL)
   {
     log_err("%s(): wsClientDesc must not be NULL!", __func__);
     return 0;
   }
 
-  if(socketClientDesc == NULL)
+  if(socketConnectionDesc == NULL)
   {
-    log_err("%s(): socketClientDesc must not be NULL!", __func__);
+    log_err("%s(): socketConnectionDesc must not be NULL!", __func__);
     return 0;
   }
 
-  switch(wsSessionDesc->state)
+  switch(wsConnectionDesc->state)
   {
     case WS_STATE_HANDSHAKE:
-      switch(wsSessionDesc->wsType)
+      switch(wsConnectionDesc->wsType)
       {
         case WS_TYPE_SERVER:
           if(parseHttpHeader(msg, len, key) == 0)
@@ -1353,10 +1370,10 @@ static size_t websocket_onMessage(void *socketUserData, void *socketClientDesc, 
                   log_dbg("%s() replyKey:%s", __func__, replyKey);
 #endif
 
-            sendWsHandshakeReply(socketClientDesc, replyKey);
+            sendWsHandshakeReply(socketConnectionDesc, replyKey);
 
             free(replyKey);
-            wsSessionDesc->state = WS_STATE_CONNECTED;
+            wsConnectionDesc->state = WS_STATE_CONNECTED;
           }
           else
           {
@@ -1365,9 +1382,9 @@ static size_t websocket_onMessage(void *socketUserData, void *socketClientDesc, 
           break;
 
         case WS_TYPE_CLIENT:
-          if(checkWsHandshakeReply(wsSessionDesc, msg, &len))
+          if(checkWsHandshakeReply(wsConnectionDesc, msg, &len))
           {
-            wsSessionDesc->state = WS_STATE_CONNECTED;
+            wsConnectionDesc->state = WS_STATE_CONNECTED;
           }
           else
           {
@@ -1382,7 +1399,7 @@ static size_t websocket_onMessage(void *socketUserData, void *socketClientDesc, 
       {
         case -1:
           log_err("couldn't parse header");
-          websocket_closeSession(wsSessionDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
+          websocket_closeConnection(wsConnectionDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
           return len;
 
         case 0:
@@ -1396,54 +1413,54 @@ static size_t websocket_onMessage(void *socketUserData, void *socketClientDesc, 
       printWsHeader(&wsHeader);
 #endif
 
-      switch(parseMessage(wsSessionDesc, msg, len, &wsHeader))
+      switch(parseMessage(wsConnectionDesc, msg, len, &wsHeader))
       {
         case WS_MSG_STATE_NO_USER_DATA:
-          wsSessionDesc->timeout.tv_nsec = 0;
-          wsSessionDesc->timeout.tv_sec = 0;
+          wsConnectionDesc->timeout.tv_nsec = 0;
+          wsConnectionDesc->timeout.tv_sec = 0;
           return wsHeader.payloadLength + wsHeader.payloadStartOffset;
 
         case WS_MSG_STATE_USER_DATA:
-          callOnMessage(wsSessionDesc);
-          if(wsSessionDesc->lastMessage.data)
-            refcnt_unref(wsSessionDesc->lastMessage.data);
-          wsSessionDesc->lastMessage.data = NULL;
-          wsSessionDesc->lastMessage.complete = false;
-          wsSessionDesc->lastMessage.firstReceived = false;
-          wsSessionDesc->lastMessage.len = 0;
-          wsSessionDesc->timeout.tv_nsec = 0;
-          wsSessionDesc->timeout.tv_sec = 0;
+          callOnMessage(wsConnectionDesc);
+          if(wsConnectionDesc->lastMessage.data)
+            refcnt_unref(wsConnectionDesc->lastMessage.data);
+          wsConnectionDesc->lastMessage.data = NULL;
+          wsConnectionDesc->lastMessage.complete = false;
+          wsConnectionDesc->lastMessage.firstReceived = false;
+          wsConnectionDesc->lastMessage.len = 0;
+          wsConnectionDesc->timeout.tv_nsec = 0;
+          wsConnectionDesc->timeout.tv_sec = 0;
           return wsHeader.payloadLength + wsHeader.payloadStartOffset;
 
         case WS_MSG_STATE_INCOMPLETE:
           clock_gettime(CLOCK_MONOTONIC, &now);
-          if(wsSessionDesc->timeout.tv_sec == (wsSessionDesc->timeout.tv_nsec == 0))
+          if(wsConnectionDesc->timeout.tv_sec == (wsConnectionDesc->timeout.tv_nsec == 0))
           {
-            wsSessionDesc->timeout = now;
+            wsConnectionDesc->timeout = now;
           }
-          else if(wsSessionDesc->timeout.tv_sec > now.tv_sec + MESSAGE_TIMEOUT_S)
+          else if(wsConnectionDesc->timeout.tv_sec > now.tv_sec + MESSAGE_TIMEOUT_S)
           {
-            free(wsSessionDesc->lastMessage.data);
-            wsSessionDesc->lastMessage.data = NULL;
-            wsSessionDesc->lastMessage.len = 0;
-            wsSessionDesc->lastMessage.complete = 0;
-            wsSessionDesc->timeout.tv_sec = 0;
-            wsSessionDesc->timeout.tv_nsec = 0;
+            free(wsConnectionDesc->lastMessage.data);
+            wsConnectionDesc->lastMessage.data = NULL;
+            wsConnectionDesc->lastMessage.len = 0;
+            wsConnectionDesc->lastMessage.complete = 0;
+            wsConnectionDesc->timeout.tv_sec = 0;
+            wsConnectionDesc->timeout.tv_nsec = 0;
             log_err("message timeout");
             return len;
           }
           return 0;
 
         case WS_MSG_STATE_ERROR:
-          if(wsSessionDesc->lastMessage.data && wsSessionDesc->lastMessage.complete)
-            refcnt_unref(wsSessionDesc->lastMessage.data);
+          if(wsConnectionDesc->lastMessage.data && wsConnectionDesc->lastMessage.complete)
+            refcnt_unref(wsConnectionDesc->lastMessage.data);
           else
-            free(wsSessionDesc->lastMessage.data);
-          wsSessionDesc->lastMessage.data = NULL;
-          wsSessionDesc->lastMessage.len = 0;
-          wsSessionDesc->lastMessage.complete = 0;
-          wsSessionDesc->timeout.tv_sec = 0;
-          wsSessionDesc->timeout.tv_nsec = 0;
+            free(wsConnectionDesc->lastMessage.data);
+          wsConnectionDesc->lastMessage.data = NULL;
+          wsConnectionDesc->lastMessage.len = 0;
+          wsConnectionDesc->lastMessage.complete = 0;
+          wsConnectionDesc->timeout.tv_sec = 0;
+          wsConnectionDesc->timeout.tv_nsec = 0;
           return len;
 
         default:
@@ -1466,7 +1483,7 @@ static size_t websocket_onMessage(void *socketUserData, void *socketClientDesc, 
 /**
  * \brief: sends binary or text data through websockets
  *
- * \param *wsSessionDescriptor: pointer to the websocket session descriptor
+ * \param *wsConnectionDesc: pointer to the websocket connection descriptor
  * \param dataType: the datatype (WS_DATA_TYPE_BINARY or WS_DATA_TYPE_TEXT)
  * \param *msg: the payload data
  * \param len: the payload length
@@ -1474,13 +1491,12 @@ static size_t websocket_onMessage(void *socketUserData, void *socketClientDesc, 
  * \return 0 if successful else -1
  *
  */
-int websocket_sendData(void *wsSessionDescriptor, enum ws_data_type dataType, const void *msg, size_t len)
+int websocket_sendData(struct websocket_connection_desc *wsConnectionDesc, enum ws_data_type dataType, const void *msg, size_t len)
 {
   unsigned char opcode;
-  struct websocket_session_desc *wsSessionDesc = wsSessionDescriptor;
-  bool masked = (wsSessionDesc->wsType == WS_TYPE_CLIENT);
+  bool masked = (wsConnectionDesc->wsType == WS_TYPE_CLIENT);
 
-  if(wsSessionDesc->state != WS_STATE_CONNECTED)
+  if(wsConnectionDesc->state != WS_STATE_CONNECTED)
     return -1;
 
   switch(dataType)
@@ -1498,14 +1514,14 @@ int websocket_sendData(void *wsSessionDescriptor, enum ws_data_type dataType, co
       return -1;
   }
 
-  return sendDataLowLevel(wsSessionDesc, opcode, true, masked, msg, len);
+  return sendDataLowLevel(wsConnectionDesc, opcode, true, masked, msg, len);
 }
 
 /**
  * \brief: sends fragmented binary or text data through websockets
  *         use websocket_sendDataFragmetedCont for further fragments
  *
- * \param *wsSessionDescriptor: pointer to the websocket session descriptor
+ * \param *wsConnectionDescriptor: pointer to the websocket connection descriptor
  * \param dataType: the datatype (WS_DATA_TYPE_BINARY or WS_DATA_TYPE_TEXT)
  * \param *msg: the payload data
  * \param len: the payload length
@@ -1513,14 +1529,13 @@ int websocket_sendData(void *wsSessionDescriptor, enum ws_data_type dataType, co
  * \return 0 if successful else -1
  *
  */
-int websocket_sendDataFragmentedStart(void *wsSessionDescriptor, enum ws_data_type dataType, const void *msg,
+int websocket_sendDataFragmentedStart(struct websocket_connection_desc *wsConnectionDesc, enum ws_data_type dataType, const void *msg,
                                       size_t len)
 {
   unsigned char opcode;
-  struct websocket_session_desc *wsSessionDesc = wsSessionDescriptor;
-  bool masked = (wsSessionDesc->wsType == WS_TYPE_CLIENT);
+  bool masked = (wsConnectionDesc->wsType == WS_TYPE_CLIENT);
 
-  if(wsSessionDesc->state != WS_STATE_CONNECTED)
+  if(wsConnectionDesc->state != WS_STATE_CONNECTED)
     return -1;
 
   switch(dataType)
@@ -1538,14 +1553,14 @@ int websocket_sendDataFragmentedStart(void *wsSessionDescriptor, enum ws_data_ty
       return -1;
   }
 
-  return sendDataLowLevel(wsSessionDesc, opcode, false, masked, msg, len);
+  return sendDataLowLevel(wsConnectionDesc, opcode, false, masked, msg, len);
 }
 
 /**
  * \brief: continues a fragmented send
  *         use sendDataFragmentedStop to stop the transmission
  *
- * \param *wsSessionDesc: pointer to the websocket session descriptor
+ * \param *wsConnectionDesc: pointer to the websocket connection descriptor
  * \param fin: true => this is the last fragment else false
  * \param *msg: the payload data
  * \param len: the payload length
@@ -1553,51 +1568,50 @@ int websocket_sendDataFragmentedStart(void *wsSessionDescriptor, enum ws_data_ty
  * \return 0 if successful else -1
  *
  */
-int websocket_sendDataFragmentedCont(void *wsSessionDescriptor, bool fin, const void *msg, size_t len)
+int websocket_sendDataFragmentedCont(struct websocket_connection_desc *wsConnectionDescriptor, bool fin, const void *msg, size_t len)
 {
-  struct websocket_session_desc *wsSessionDesc = wsSessionDescriptor;
-  bool masked = (wsSessionDesc->wsType == WS_TYPE_CLIENT);
+  struct websocket_connection_desc *wsConnectionDesc = wsConnectionDescriptor;
+  bool masked = (wsConnectionDesc->wsType == WS_TYPE_CLIENT);
 
-  if(wsSessionDesc->state != WS_STATE_CONNECTED)
+  if(wsConnectionDesc->state != WS_STATE_CONNECTED)
     return -1;
 
-  return sendDataLowLevel(wsSessionDesc, WS_OPCODE_CONTINUATION, fin, masked, msg, len);
+  return sendDataLowLevel(wsConnectionDesc, WS_OPCODE_CONTINUATION, fin, masked, msg, len);
 }
 
 /**
- * \brief: closes the given websocket session
+ * \brief: closes the given websocket connection
  *
- * \param *wsSessionDesc: pointer to the websocket session descriptor
+ * \param *wsConnectionDesc: pointer to the websocket connection descriptor
  * \param code: the closing code
  */
-void websocket_closeSession(void *wsSessionDescriptor, enum ws_close_code code)
+void websocket_closeConnection(struct websocket_connection_desc *wsConnectionDesc, enum ws_close_code code)
 {
-  struct websocket_session_desc *wsSessionDesc = wsSessionDescriptor;
   unsigned char help[2];
-  bool masked = (wsSessionDesc->wsType == WS_TYPE_CLIENT);
+  bool masked = (wsConnectionDesc->wsType == WS_TYPE_CLIENT);
 
   help[0] = (unsigned long)code >> 8;
   help[1] = (unsigned long)code & 0xFF;
 
-  sendDataLowLevel(wsSessionDesc, WS_OPCODE_DISCONNECT, true, masked, help, 2);
+  sendDataLowLevel(wsConnectionDesc, WS_OPCODE_DISCONNECT, true, masked, help, 2);
 
-  if(wsSessionDesc->lastMessage.data && wsSessionDesc->lastMessage.complete)
-    refcnt_unref(wsSessionDesc->lastMessage.data);
+  if(wsConnectionDesc->lastMessage.data && wsConnectionDesc->lastMessage.complete)
+    refcnt_unref(wsConnectionDesc->lastMessage.data);
   else
-    free(wsSessionDesc->lastMessage.data);
+    free(wsConnectionDesc->lastMessage.data);
 
-  wsSessionDesc->lastMessage.data = NULL;
-  wsSessionDesc->lastMessage.len = 0;
-  wsSessionDesc->lastMessage.complete = 0;
+  wsConnectionDesc->lastMessage.data = NULL;
+  wsConnectionDesc->lastMessage.len = 0;
+  wsConnectionDesc->lastMessage.complete = 0;
 
-  switch(wsSessionDesc->wsType)
+  switch(wsConnectionDesc->wsType)
   {
     case WS_TYPE_SERVER:
-      socketServer_closeClient(wsSessionDesc->socketClientDesc);
+      socketServer_closeConnection(wsConnectionDesc->socketClientDesc);
       break;
 
     case WS_TYPE_CLIENT:
-      socketClient_closeConnection(wsSessionDesc->socketClientDesc);
+      socketClient_closeConnection(wsConnectionDesc->socketClientDesc);
       break;
   }
 }
@@ -1605,14 +1619,12 @@ void websocket_closeSession(void *wsSessionDescriptor, enum ws_close_code code)
 /**
  * \brief: returns the user data of the given client
  *
- * \param *wsSessionDesc: pointer to the websocket client descriptor
+ * \param *wsConnectionDesc: pointer to the websocket client descriptor
  *
  */
-void* websocket_getClientUserData(void *wsSessionDesc)
+void* websocket_getConnectionUserData(struct websocket_connection_desc *wsConnectionDesc)
 {
-  struct websocket_session_desc *wsSessionDescriptor = wsSessionDesc;
-
-  return wsSessionDescriptor->sessionUserData;
+  return wsConnectionDesc->connectionUserData;
 }
 
 /**
@@ -1623,26 +1635,28 @@ void* websocket_getClientUserData(void *wsSessionDesc)
  *
  * \return: the websocket descriptor or NULL in case of error
  */
-void* websocketServer_open(struct websocket_server_init *wsInit, void *websocketUserData)
+struct websocket_server_desc *websocketServer_open(struct websocket_server_init *wsInit, void *websocketUserData)
 {
-  struct socket_init socketInit;
-  struct websocket_desc *wsDesc;
+  struct socket_server_init socketInit;
+  struct websocket_server_desc *wsDesc;
 
-  wsDesc = refcnt_allocate(sizeof(struct websocket_desc), NULL);
+  wsDesc = refcnt_allocate(sizeof(struct websocket_server_desc), NULL);
   if(!wsDesc)
   {
     log_err("refcnt_allocate failed");
     return NULL;
   }
+  memset(wsDesc, 0, sizeof(struct websocket_server_desc));
 
   wsDesc->ws_onOpen = wsInit->ws_onOpen;
   wsDesc->ws_onClose = wsInit->ws_onClose;
+  wsDesc->ws_onCloseLegacy = NULL;
   wsDesc->ws_onMessage = wsInit->ws_onMessage;
   wsDesc->wsSocketUserData = websocketUserData;
 
   socketInit.address = wsInit->address;
   socketInit.port = wsInit->port;
-  socketInit.socket_onOpen = websocket_onOpen;
+  socketInit.socket_onOpen = websocketServer_onOpen;
   socketInit.socket_onClose = websocket_onClose;
   socketInit.socket_onMessage = websocket_onMessage;
 
@@ -1658,6 +1672,19 @@ void* websocketServer_open(struct websocket_server_init *wsInit, void *websocket
 }
 
 /**
+ * \brief: closes the given websocket server
+ *
+ * \param *wsDesc: pointer to the websocket descriptor
+ *
+ */
+void websocketServer_close(struct websocket_server_desc *wsDesc)
+{
+  socketServer_close(wsDesc->socketDesc);
+  refcnt_unref(wsDesc);
+}
+
+
+/**
  * \brief opens a websocket client connection
  *
  * \param wsInit: pointer to the init struct
@@ -1665,7 +1692,7 @@ void* websocketServer_open(struct websocket_server_init *wsInit, void *websocket
  *
  * \return: the websocket client descriptor or NULL in case of error
  */
-void* websocketClient_open(struct websocket_client_init *wsInit, void *websocketUserData)
+struct websocket_connection_desc *websocketClient_open(struct websocket_client_init *wsInit, void *websocketUserData)
 {
   struct socket_client_init socketInit;
   struct websocket_client_desc *wsDesc;
@@ -1684,17 +1711,17 @@ void* websocketClient_open(struct websocket_client_init *wsInit, void *websocket
   wsDesc->ws_onOpen = wsInit->ws_onOpen;
   wsDesc->ws_onClose = wsInit->ws_onClose;
   wsDesc->ws_onMessage = wsInit->ws_onMessage;
-  wsDesc->session.wsType = WS_TYPE_CLIENT;
-  wsDesc->session.state = WS_STATE_HANDSHAKE;
-  wsDesc->session.lastMessage.firstReceived = false;
-  wsDesc->session.lastMessage.complete = false;
-  wsDesc->session.lastMessage.data = NULL;
-  wsDesc->session.lastMessage.len = 0;
-  wsDesc->session.timeout.tv_nsec = 0;
-  wsDesc->session.timeout.tv_sec = 0;
-  wsDesc->session.sessionUserData = NULL; //unused in client mode because it's the same as socket user data
-  wsDesc->session.wsDesc.wsClientDesc = wsDesc; //the session should know it's parent
-  wsDesc->session.socketClientDesc = NULL;
+  wsDesc->connection.wsType = WS_TYPE_CLIENT;
+  wsDesc->connection.state = WS_STATE_HANDSHAKE;
+  wsDesc->connection.lastMessage.firstReceived = false;
+  wsDesc->connection.lastMessage.complete = false;
+  wsDesc->connection.lastMessage.data = NULL;
+  wsDesc->connection.lastMessage.len = 0;
+  wsDesc->connection.timeout.tv_nsec = 0;
+  wsDesc->connection.timeout.tv_sec = 0;
+  wsDesc->connection.connectionUserData = NULL; //unused in client mode because it's the same as socket user data
+  wsDesc->connection.wsDesc.wsClientDesc = wsDesc; //the connection should know it's parent
+  wsDesc->connection.socketClientDesc = NULL;
   wsDesc->address = strdup(wsInit->address);
   if(wsDesc->address == NULL)
   {
@@ -1728,13 +1755,13 @@ void* websocketClient_open(struct websocket_client_init *wsInit, void *websocket
   socketInit.socket_onClose = websocket_onClose;
   socketInit.socket_onMessage = websocket_onMessage;
 
-  wsDesc->session.socketClientDesc = socketClient_open(&socketInit, wsDesc);
-  if(!wsDesc->session.socketClientDesc)
+  wsDesc->connection.socketClientDesc = socketClient_open(&socketInit, wsDesc);
+  if(!wsDesc->connection.socketClientDesc)
   {
     log_err("socketServer_open failed");
     goto ERROR;
   }
-  wsDesc->socketDesc = wsDesc->session.socketClientDesc;
+  wsDesc->socketDesc = wsDesc->connection.socketClientDesc;
 
   socketClient_start(wsDesc->socketDesc);
 
@@ -1743,7 +1770,7 @@ void* websocketClient_open(struct websocket_client_init *wsInit, void *websocket
 
   clock_gettime(CLOCK_MONOTONIC, &timeoutStartTime);
 
-  while(wsDesc->session.state == WS_STATE_HANDSHAKE)
+  while(wsDesc->connection.state == WS_STATE_HANDSHAKE)
   {
     clock_gettime(CLOCK_MONOTONIC, &currentTime);
     if(currentTime.tv_sec > timeoutStartTime.tv_sec + MESSAGE_TIMEOUT_S)
@@ -1751,24 +1778,23 @@ void* websocketClient_open(struct websocket_client_init *wsInit, void *websocket
     usleep(10000);
   }
 
-  return &wsDesc->session;
+  return &wsDesc->connection;
 
-  ERROR: websocketClient_close(&wsDesc->session);
+  ERROR: websocketClient_close(&wsDesc->connection);
   return NULL;
 }
 
 /**
  * \brief closes a websocket client
  *
- * \param *wsClientDesc Pointer to the websocket client descriptor
+ * \param *wsConnectionDesc Pointer to the websocket client descriptor
  */
-void websocketClient_close(void *wsSessionDescriptor)
+void websocketClient_close(struct websocket_connection_desc *wsConnectionDesc)
 {
-  struct websocket_session_desc *wsSessionDesc = wsSessionDescriptor;
-  if(wsSessionDesc == NULL)
+  if(wsConnectionDesc == NULL)
     return;
 
-  struct websocket_client_desc *wsDesc = wsSessionDesc->wsDesc.wsClientDesc;
+  struct websocket_client_desc *wsDesc = wsConnectionDesc->wsDesc.wsClientDesc;
 
   if(wsDesc == NULL)
     return;
@@ -1778,7 +1804,7 @@ void websocketClient_close(void *wsSessionDescriptor)
     socketClient_close(wsDesc->socketDesc);
     wsDesc->socketDesc = NULL;
   }
-  wsDesc->session.state = WS_STATE_CLOSED;
+  wsDesc->connection.state = WS_STATE_CLOSED;
   free(wsDesc->address);
   wsDesc->address = NULL;
   free(wsDesc->port);
@@ -1793,27 +1819,13 @@ void websocketClient_close(void *wsSessionDescriptor)
 /**
  * \brief returns if the client is still connected
  *
+ * \param *wsConnectionDesc Pointer to the websocket connection descriptor
+ *
  * \return true => connected else false
  */
-bool websocketClient_isConnected(void *wsSessionDescriptor)
+bool websocketConnection_isConnected(struct websocket_connection_desc *wsConnectionDesc)
 {
-  struct websocket_session_desc *wsSessionDesc = wsSessionDescriptor;
-
-  return (wsSessionDesc->state != WS_STATE_CLOSED);
-}
-
-/**
- * \brief: closes the given websocket server
- *
- * \param *wsDesc: pointer to the websocket descriptor
- *
- */
-void websocketServer_close(void *wsDesc)
-{
-  struct websocket_desc *websockDesc = wsDesc;
-
-  socketServer_close(websockDesc->socketDesc);
-  refcnt_unref(websockDesc);
+  return (wsConnectionDesc->state != WS_STATE_CLOSED);
 }
 
 /**
@@ -1836,4 +1848,81 @@ void websocket_unref(void *ptr)
   refcnt_unref(ptr);
 }
 
+/* ------------------------------ LEGACY FUNCTIONS ------------------------------ */
 
+/**
+ * \brief: opens a websocket server
+ *
+ * \param wsInit: pointer to the init struct
+ * \param websocketUserData: userData for the socket
+ *
+ * \return: the websocket descriptor or NULL in case of error
+ *
+ * \note this function is for backward compatibility
+ *       it should not be used anymore but will not be
+ *       removed unless there's a good reason
+ */
+void *websocket_open(struct websocket_init *wsInit, void *websocketUserData)
+{
+  struct socket_server_init socketInit;
+  struct websocket_server_desc *wsDesc;
+
+  wsDesc = refcnt_allocate(sizeof(struct websocket_server_desc), NULL);
+  if(!wsDesc)
+  {
+    log_err("refcnt_allocate failed");
+    return NULL;
+  }
+  memset(wsDesc, 0, sizeof(struct websocket_server_desc));
+
+  wsDesc->ws_onOpenLegacy = (void*(*)(struct websocket_server_desc *, struct websocket_connection_desc *)) wsInit->ws_onOpen;
+  wsDesc->ws_onCloseLegacy = (void (*)(void*, struct websocket_connection_desc*, void*))wsInit->ws_onClose;
+  wsDesc->ws_onClose = NULL;
+  wsDesc->ws_onMessage =
+      (void (*)(void*, struct websocket_connection_desc*, void*, enum ws_data_type, void*, size_t))wsInit->ws_onMessage;
+  wsDesc->wsSocketUserData = websocketUserData;
+
+  socketInit.address = wsInit->address;
+  socketInit.port = wsInit->port;
+  socketInit.socket_onOpen = websocketServer_onOpen;
+  socketInit.socket_onClose = websocket_onClose;
+  socketInit.socket_onMessage = websocket_onMessage;
+
+  wsDesc->socketDesc = socketServer_open(&socketInit, wsDesc);
+  if(!wsDesc->socketDesc)
+  {
+    log_err("socketServer_open failed");
+    refcnt_unref(wsDesc);
+    return NULL;
+  }
+
+  return wsDesc;
+}
+
+/**
+ * \brief: closes the given websocket server
+ *
+ * \param *wsDesc: pointer to the websocket descriptor
+ *
+ * \note LEGACY!!! This function is for backward compatibility
+ *       it should not be used anymore but will not be
+ *       removed unless there's a good reason
+ */
+void websocket_close(void *wsDesc)
+{
+  websocketServer_close(wsDesc);
+}
+
+/**
+ * \brief: returns the user data of the given connection
+ *
+ * \param *wsClientDesc: pointer to the websocket client descriptor
+ *
+ * \note LEGACY!!! This function is for backward compatibility
+ *       it should not be used anymore but will not be
+ *       removed unless there's a good reason
+ */
+void *websocket_getClientUserData(void *wsClientDesc)
+{
+  return websocket_getConnectionUserData(wsClientDesc);
+}
