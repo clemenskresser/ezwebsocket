@@ -1,5 +1,5 @@
 # ezwebsocket
-Simple Websocket Library written in C
+Simple Websocket Library that supports server and client written in C
 
 # Features:
 
@@ -27,38 +27,44 @@ compile with:
 $> gcc example_server.c -lezwebsocket -o example_server
 
 ```c
-/*
- * example_server.c
+/**
+ * \file      example_server.c
+ * \author    Clemens Kresser
+ * \date      Mar 22, 2017
+ * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
+ * \license   This project is released under the MIT License.
+ * \brief     simple server example
  *
- *  Created on: Mar 22, 2017
- *      Author: Clemens Kresser
- *      License: MIT
  */
 
 #include <stdio.h>
 #include <unistd.h>
 #include <websocket.h>
+#include <string.h>
 
-void *onOpen(void *socketUserData, void *clientDesc)
+void* onOpen(void *websocketUserData, struct websocket_server_desc *wsDesc,
+             struct websocket_connection_desc *connectionDesc)
 {
   printf("%s()\n", __func__);
 
   //you can return user data here which is then
-  //passed to onMessage as userData
+  //passed to onMessage as clientUserData
   return NULL;
 }
 
-void onMessage(void *socketUserData, void *clientDesc, void *userData, enum ws_data_type dataType, void *msg, size_t len)
+void onMessage(void *websocketUserData, struct websocket_connection_desc *connectionDesc, void *clientUserData,
+               enum ws_data_type dataType, void *msg, size_t len)
 {
   printf("%s()\n", __func__);
   if(dataType == WS_DATA_TYPE_TEXT)
   {
-    printf("received:%s\n",(char*)msg);
+    printf("received:%s\n", (char*)msg);
   }
-  websocket_sendData(clientDesc, dataType, msg, len);
+  websocket_sendData(connectionDesc, dataType, msg, len);
 }
 
-void onClose(void *socketUserData, void *clientDesc, void *userData)
+void onClose(struct websocket_server_desc *wsDesc, void *websocketUserData,
+             struct websocket_connection_desc *connectionDesc, void *userData)
 {
   printf("%s()\n", __func__);
 }
@@ -68,6 +74,8 @@ int main(int argc, char *argv[])
   struct websocket_server_init websocketInit;
   void *wsDesc;
 
+  const char *sendText = "Hello World From Ezwebsocket";
+
   websocketInit.port = "9001";
   websocketInit.address = "0.0.0.0";
   websocketInit.ws_onOpen = onOpen;
@@ -75,19 +83,20 @@ int main(int argc, char *argv[])
   websocketInit.ws_onMessage = onMessage;
 
   wsDesc = websocketServer_open(&websocketInit, NULL);
-  if (wsDesc == NULL)
+  if(wsDesc == NULL)
     return -1;
 
   for(;;)
   {
-    sleep(10);
+    //send "Hello World From Ezwebsocket" every second
+    websocket_sendData(wsDesc, WS_DATA_TYPE_TEXT, sendText, strlen(sendText) + 1);
+    sleep(1);
   }
 
-  websocket_close(wsDesc);
+  websocketServer_close(wsDesc);
 
   return 0;
 }
-
 ```
 
 # Websocket client example
@@ -97,12 +106,14 @@ compile with:
 $> gcc example_client.c -lezwebsocket -o example_client
 
 ```c
-/*
- * example_client.c
+/**
+ * \file      example_client.c
+ * \author    Clemens Kresser
+ * \date      Nov 17, 2020
+ * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
+ * \license   This project is released under the MIT License.
+ * \brief     simple client example
  *
- *  Created on: Nov 17, 2020
- *      Author: Clemens Kresser
- *      License: MIT
  */
 
 #include <stdio.h>
@@ -110,7 +121,8 @@ $> gcc example_client.c -lezwebsocket -o example_client
 #include <websocket.h>
 #include <string.h>
 
-void *onOpen(void *socketUserData, void *wsDesc, void *clientDesc)
+void* onOpen(void *socketUserData, struct websocket_client_desc *wsDesc,
+             struct websocket_connection_desc *connectionDesc)
 {
   printf("%s()\n", __func__);
 
@@ -118,20 +130,19 @@ void *onOpen(void *socketUserData, void *wsDesc, void *clientDesc)
   //passed to onMessage as userData
   return NULL;
 }
-static int count = 0;
 
-void onMessage(void *socketUserData, void *sessionDesc, void *sessionUserData, enum ws_data_type dataType, void *msg, size_t len)
+void onMessage(void *socketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData,
+               enum ws_data_type dataType, void *msg, size_t len)
 {
-  printf("%s() %u\n", __func__, count++);
   if(dataType == WS_DATA_TYPE_TEXT)
   {
-    printf("received:%s\n",(char*)msg);
+    printf("received:%s\n", (char*)msg);
   }
 }
 
-void onClose(void *socketUserData, void *clientDesc, void *userData)
+void onClose(void *socketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData)
 {
-  printf("%s() %u\n", __func__, count);
+  printf("%s()\n", __func__);
 }
 
 int main(int argc, char *argv[])
@@ -148,12 +159,13 @@ int main(int argc, char *argv[])
   websocketInit.ws_onMessage = onMessage;
 
   wsDesc = websocketClient_open(&websocketInit, NULL);
-  if (wsDesc == NULL)
+  if(wsDesc == NULL)
     return -1;
 
   for(unsigned long i = 0; i < 10; i++)
   {
-	websocket_sendData(wsDesc, WS_DATA_TYPE_TEXT, sendText, strlen(sendText) + 1);
+    //send "Hello World From Ezwebsocket" every second
+    websocket_sendData(wsDesc, WS_DATA_TYPE_TEXT, sendText, strlen(sendText) + 1);
     sleep(1);
   }
 
@@ -161,7 +173,6 @@ int main(int argc, char *argv[])
 
   return 0;
 }
-
 ```
 
 # Running the Autobahn Tests
