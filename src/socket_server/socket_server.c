@@ -294,6 +294,8 @@ static int startConnection(int socketFd, struct socket_server_desc *socketDesc)
     return -1;
   }
 
+  memset(desc, 0, sizeof(struct socket_connection_desc));
+
   desc->connectionSocketFd = socketFd;
   desc->socketDesc = socketDesc;
   dynBuffer_init(&(desc->buffer));

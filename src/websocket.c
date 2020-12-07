@@ -1153,6 +1153,7 @@ static void* websocketServer_onOpen(void *socketUserData, struct socket_connecti
 
   refcnt_ref(socketSesionDesc);
   wsConnectionDesc = refcnt_allocate(sizeof(struct websocket_connection_desc), NULL);
+  memset(wsConnectionDesc, 0, sizeof(struct websocket_connection_desc));
   wsConnectionDesc->wsType = WS_TYPE_SERVER;
   wsConnectionDesc->socketClientDesc = socketSesionDesc;
   wsConnectionDesc->state = WS_STATE_HANDSHAKE;
