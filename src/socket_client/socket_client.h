@@ -4,7 +4,7 @@
  * \date      Jun 26, 2020
  * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
  * \license   This project is released under the MIT License.
- * \brief     event based socket client implementation
+ * \brief     Event based socket client implementation
  *
  */
 #ifndef SOCKET_CLIENT_SOCKET_CLIENT_H_

@@ -4,7 +4,7 @@
  * \date      Mar 25, 2017
  * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
  * \license   This project is released under the MIT License.
- * \brief     implements strnstr if it's not available
+ * \brief     Implements strnstr if it's not available
  *
  */
 

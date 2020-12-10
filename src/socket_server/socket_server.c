@@ -4,7 +4,7 @@
  * \date      Mar 23, 2017
  * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
  * \license   This project is released under the MIT License.
- * \brief     event based socket server implementation
+ * \brief     Event based socket server implementation
  *
  */
 
@@ -87,12 +87,12 @@ struct socket_server_desc
 };
 
 /**
- * \brief: adds a connection to the list of the socket descriptor
+ * \brief Adds a connection to the list of the socket descriptor
  *
- * \param *socketDesc: pointer to the socket descriptor
- * \param *desc: pointer to the connection descriptor that should be added
+ * \param *socketDesc Pointer to the socket descriptor
+ * \param *desc Pointer to the connection descriptor that should be added
  *
- * \return: 0 if successful else -1
+ * \return 0 if successful else -1
  */
 static int addConnection(struct socket_server_desc *socketDesc, struct socket_connection_desc *desc)
 {
@@ -128,12 +128,12 @@ static int addConnection(struct socket_server_desc *socketDesc, struct socket_co
 }
 
 /**
- * \brief: removes a connection from the list of the socket descriptor
+ * \brief removes a connection from the list of the socket descriptor
  *
- * \param *socketDesc: pointer to the socket descriptor
- * \param *desc: pointer to the connection descriptor that should be removed
+ * \param *socketDesc Pointer to the socket descriptor
+ * \param *desc Pointer to the connection descriptor that should be removed
  *
- * \return: 0 if successful else -1
+ * \return 0 if successful else -1
  */
 static int removeConnection(struct socket_server_desc *socketDesc, struct socket_connection_desc *desc)
 {
@@ -168,9 +168,9 @@ static int removeConnection(struct socket_server_desc *socketDesc, struct socket
 }
 
 /**
- * \brief: closes all connections
+ * \brief closes all connections
  *
- * \param *socketDesc: pointer to the socket descriptor
+ * \param *socketDesc Pointer to the socket descriptor
  */
 static void closeAllConnections(struct socket_server_desc *socketDesc)
 {
@@ -192,11 +192,11 @@ static void closeAllConnections(struct socket_server_desc *socketDesc)
 
 
 /**
- * \brief: connection thread
+ * \brief connection thread
  *
- * \param *params: pointer to the connectionDesc (steals the reference)
+ * \param *params Pointer to the connectionDesc (steals the reference)
  *
- * \return: NULL
+ * \return NULL
  */
 static void *connectionThread(void *params)
 {
@@ -276,10 +276,10 @@ static void *connectionThread(void *params)
 }
 
 /**
- * \brief: starts a new connection
+ * \brief starts a new connection
  *
- * \param socketFd: the socket file descriptor
- * \param socketDesc: pointer to the socket descriptor
+ * \param socketFd The socket file descriptor
+ * \param socketDesc Pointer to the socket descriptor
  *
  * \return 0 if successful else -1
  */
@@ -315,10 +315,10 @@ static int startConnection(int socketFd, struct socket_server_desc *socketDesc)
 }
 
 /**
- * \brief: closes the given connection
+ * \brief closes the given connection
  *
- * \param *socketDesc: pointer to the socket descriptor
- * \param *desc: pointer to the connection descriptor
+ * \param *socketDesc Pointer to the socket descriptor
+ * \param *desc Pointer to the connection descriptor
  */
 void socketServer_closeConnection(struct socket_connection_desc *socketConnectionDesc)
 {
@@ -328,13 +328,13 @@ void socketServer_closeConnection(struct socket_connection_desc *socketConnectio
 }
 
 /**
- * \brief: sends the given data over the given socket
+ * \brief sends the given data over the given socket
  *
- * \param *connectionDesc: pointer to the connection descriptor
- * \param *msg: pointer to the data
- * \param len: the length of the data
+ * \param *connectionDesc Pointer to the connection descriptor
+ * \param *msg Pointer to the data
+ * \param len The length of the data
  *
- * \return: 0 if successful else -1
+ * \return 0 if successful else -1
  */
 int socketServer_send(struct socket_connection_desc *connectionDesc, void *msg, size_t len)
 {
@@ -353,11 +353,11 @@ int socketServer_send(struct socket_connection_desc *connectionDesc, void *msg, 
 #define BUFSIZE 20
 
 /**
- * \brief: processes connection requests
+ * \brief processes connection requests
  *
- * \param *socketDesc: pointer to the socket descriptor
+ * \param *socketDesc Pointer to the socket descriptor
  *
- * \return: NULL
+ * \return NULL
  *
  */
 static void *socketServerThread(void *sockDesc)
@@ -405,12 +405,12 @@ static void *socketServerThread(void *sockDesc)
 }
 
 /**
- * \brief: opens a socket server
+ * \brief opens a socket server
  *
- * \param *socketInit: pointer to the socket init struct
- * \param * socketUserData: pointer to the user data that should be used
+ * \param *socketInit Pointer to the socket init struct
+ * \param * socketUserData Pointer to the user data that should be used
  *
- * \return: pointer to the socket descriptor
+ * \return pointer to the socket descriptor
  */
 struct socket_server_desc *socketServer_open(struct socket_server_init *socketInit, void *socketUserData)
 {
@@ -514,9 +514,9 @@ struct socket_server_desc *socketServer_open(struct socket_server_init *socketIn
 }
 
 /**
- * \brief: closes the given socket server
+ * \brief closes the given socket server
  *
- * \param *socketDesc: pointer to the socket descriptor as retrieved from socketServer_open
+ * \param *socketDesc Pointer to the socket descriptor as retrieved from socketServer_open
  *
  */
 void socketServer_close(struct socket_server_desc *socketDesc)

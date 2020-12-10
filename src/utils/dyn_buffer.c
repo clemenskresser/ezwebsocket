@@ -4,7 +4,7 @@
  * \date      Mar 23, 2017
  * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
  * \license   This project is released under the MIT License.
- * \brief     dynamic buffers that are used to merge and split received data
+ * \brief     Dynamic buffers that are used to merge and split received data
  *
  */
 
@@ -17,9 +17,9 @@
 
 
 /**
- * \brief: initializes a dynamic buffer
+ * \brief Initializes a dynamic buffer
  *
- * \param *buffer: pointer to the buffer
+ * \param *buffer Pointer to the buffer
  */
 void dynBuffer_init(struct dyn_buffer *buffer)
 {
@@ -29,12 +29,12 @@ void dynBuffer_init(struct dyn_buffer *buffer)
 }
 
 /**
- * \brief: increases the buffer that it has the given amount of free memory
+ * \brief Increases the buffer that it has the given amount of free memory
  *
- * \param *buffer: pointer to the buffer
- * \param numFreeBytes: the number of bytes that should be free after increase
+ * \param *buffer Pointer to the buffer
+ * \param numFreeBytes The number of bytes that should be free after increase
  *
- * \return: 0 if successful else -1
+ * \return 0 if successful else -1
  *
  */
 int dynBuffer_increase_to(struct dyn_buffer *buffer, size_t numFreeBytes)
@@ -76,10 +76,10 @@ int dynBuffer_increase_to(struct dyn_buffer *buffer, size_t numFreeBytes)
 }
 
 /**
- * \brief: removes the given amount of leading bytes from the buffer
+ * \brief Removes the given amount of leading bytes from the buffer
  *
- * \param *buffer: pointer to the buffer
- * \param count: the number of bytes that should be removed
+ * \param *buffer Pointer to the buffer
+ * \param count The number of bytes that should be removed
  *
  * \return 0 if successful else -1
  */
@@ -117,11 +117,11 @@ int dynBuffer_removeLeadingBytes(struct dyn_buffer *buffer, size_t count)
 }
 
 /**
- * \brief: deallocates all memory that was allocated by the buffer
+ * \brief Deallocates all memory that was allocated by the buffer
  *
- * \param *buffer: pointer to the buffer
+ * \param *buffer Pointer to the buffer
  *
- * \return: 0 if successful else -1
+ * \return 0 if successful else -1
  *
  */
 int dynBuffer_delete(struct dyn_buffer *buffer)

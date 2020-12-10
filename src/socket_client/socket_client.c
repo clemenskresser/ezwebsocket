@@ -4,7 +4,7 @@
  * \date      Jun 26, 2020
  * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
  * \license   This project is released under the MIT License.
- * \brief     event based socket client implementation
+ * \brief     Event based socket client implementation
  *
  */
 
@@ -61,9 +61,9 @@ struct socket_client_desc
 };
 
 /**
- * \brief the socket client thread
+ * \brief The socket client thread
  *
- * \param *socketDescriptor pointer to the socket descriptor
+ * \param *socketDescriptor Pointer to the socket descriptor
  *
  * \return NULL
  */
@@ -145,13 +145,13 @@ static void* socketClientThread(void *socketDescriptor)
 }
 
 /**
- * \brief: sends the given data over the given socket
+ * \brief Sends the given data over the given socket
  *
- * \param *socketDescriptor: pointer to the socket descriptor
- * \param *msg: pointer to the data
- * \param len: the length of the data
+ * \param *socketDescriptor Pointer to the socket descriptor
+ * \param *msg Pointer to the data
+ * \param len The length of the data
  *
- * \return: 0 if successful else -1
+ * \return 0 if successful else -1
  */
 int socketClient_send(void *socketDescriptor, void *msg, size_t len)
 {
@@ -174,7 +174,7 @@ int socketClient_send(void *socketDescriptor, void *msg, size_t len)
 }
 
 /**
- * \brief starts the socket client
+ * \brief Starts the socket client
  *        must be called after socketClient_open
  *
  * \param *socketDescriptor Pointer to the socket descriptor
@@ -187,12 +187,12 @@ void socketClient_start(void *socketDescriptor)
 }
 
 /**
- * \brief opens a socket client
+ * \brief Opens a socket client
  *
- * \param *socketInit pointer to the socket_init struct
- * \param *socketUserData pointer to the the userdata
+ * \param *socketInit Pointer to the socket_init struct
+ * \param *socketUserData Pointer to the the userdata
  *
- * \return pointer to the socket descriptor
+ * \return Pointer to the socket descriptor
  */
 void* socketClient_open(struct socket_client_init *socketInit, void *socketUserData)
 {
@@ -269,9 +269,9 @@ void* socketClient_open(struct socket_client_init *socketInit, void *socketUserD
 }
 
 /**
- * \brief closes the socket client
+ * \brief Closes the socket client
  *
- * \param *socketDescriptor pointer to the socket descriptor
+ * \param *socketDescriptor Pointer to the socket descriptor
  */
 void socketClient_close(void *socketDescriptor)
 {
@@ -305,9 +305,9 @@ void socketClient_close(void *socketDescriptor)
 }
 
 /**
- * \brief closes the connection, but doesn't free ressources
+ * \brief Closes the connection, but doesn't free ressources
  *
- * \param *socketDescriptor pointer to the socket descriptor
+ * \param *socketDescriptor Pointer to the socket descriptor
  */
 void socketClient_closeConnection(void *socketDescriptor)
 {

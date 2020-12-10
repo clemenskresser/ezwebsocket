@@ -4,7 +4,7 @@
  * \date      Mar 23, 2017
  * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
  * \license   This project is released under the MIT License.
- * \brief     event based socket server implementation
+ * \brief     Event based socket server implementation
  *
  */
 
@@ -36,9 +36,6 @@ void socketServer_closeConnection(struct socket_connection_desc *socketClientDes
 int socketServer_send(struct socket_connection_desc *connectionDesc, void *msg, size_t len);
 struct socket_server_desc *socketServer_open(struct socket_server_init *socketInit, void *socketUserData);
 void socketServer_close(struct socket_server_desc *socketDesc);
-
-
-//int socketServer_mainLoop(struct socket_init *socketInit, void *socketUserData);
 
 
 #endif /* SOCKET_SERVER_H_ */

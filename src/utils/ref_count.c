@@ -4,7 +4,7 @@
  * \date      Mar 26, 2017
  * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
  * \license   This project is released under the MIT License.
- * \brief     simple reference counting implementation
+ * \brief     Simple reference counting implementation
  *
  */
 
@@ -31,13 +31,13 @@ struct ref_cnt_obj
 };
 
 /**
- * \brief allocates a buffer with reference counting
+ * \brief Allocates a buffer with reference counting
  *
- * \param size the wanted size
- * \param void(*pfnFree)(void*) function that frees elements inside the buffer if necessary the buffer is freed on it's own
+ * \param size The wanted size
+ * \param *pfnFree Function that frees elements inside the buffer if necessary the buffer is freed on it's own
  *                            or NULL if not needed
  *
- * \return pointer to the allocated buffer;
+ * \return Pointer to the allocated buffer
  */
 void *refcnt_allocate(size_t size, void (*pfnFree)(void*))
 {
@@ -59,9 +59,9 @@ void *refcnt_allocate(size_t size, void (*pfnFree)(void*))
 }
 
 /**
- * \brief increments the reference count of the given object
+ * \brief Increments the reference count of the given object
  *
- * \param *ptr poiner to the object
+ * \param *ptr Pointer to the object
  */
 void refcnt_ref(void *ptr)
 {
@@ -78,9 +78,9 @@ void refcnt_ref(void *ptr)
 }
 
 /**
- * \brief decrements the reference count of the given object and frees it if necessary
+ * \brief Decrements the reference count of the given object and frees it if necessary
  *
- * \param *ptr poiner to the object
+ * \param *ptr Pointer to the object
  */
 void refcnt_unref(void *ptr)
 {

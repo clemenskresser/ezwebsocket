@@ -4,7 +4,7 @@
  * \date      Mar 23, 2017
  * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
  * \license   This project is released under the MIT License.
- * \brief     handles the websocket specific stuff
+ * \brief     Handles the websocket specific stuff
  *
  */
 
@@ -148,11 +148,11 @@ struct websocket_client_desc
 #define WS_ACCEPT_MAGIC_KEY "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 /**
- * \brief: calculates the Sec-WebSocket-Accept from the Sec-WebSocket-Key
+ * \brief Calculates the Sec-WebSocket-Accept from the Sec-WebSocket-Key
  *
- * \param *key: pointer to the key that should be used
+ * \param *key Pointer to the key that should be used
  *
- * \return: to the string containing the Sec-WebSocket-Accept (must be freed after use)
+ * \return The string containing the Sec-WebSocket-Accept (must be freed after use)
  */
 static char* calculateSecWebSocketAccept(const char *key)
 {
@@ -177,13 +177,13 @@ static char* calculateSecWebSocketAccept(const char *key)
 #define WS_HS_KEY_LEN 25
 
 /*
- * \brief: parses the http header and extracts the Sec-WebSocket-Key
+ * \brief Parses the http header and extracts the Sec-WebSocket-Key
  *
- * \param *wsHeader: pointer to the string with the header
- * \param len: length of the header
- * \param *key: pointer to where the key should be stored (should be at least WS_HS_KEY_LEN big)
+ * \param *wsHeader Pointer to the string with the header
+ * \param len Length of the header
+ * \param[out] *key Pointer to where the key should be stored (should be at least WS_HS_KEY_LEN big)
  *
- * \return: 0 if successful else -1
+ * \return 0 if successful else -1
  *
  */
 static int parseHttpHeader(const char *wsHeader, size_t len, char *key)
@@ -229,15 +229,15 @@ static int parseHttpHeader(const char *wsHeader, size_t len, char *key)
                                      "\r\n"
 
 /**
- * \brief: sends the websocket handshake reply
+ * \brief Sends the websocket handshake reply
  *
- * \param *socketClientDesc: the client descriptor of the socket
- * \param *replyKey: the calculated Sec-WebSocket-Accept key
+ * \param *socketConnectionDesc The connection descriptor of the socket
+ * \param *replyKey The calculated Sec-WebSocket-Accept key
  *
- * \return: -1 on error 0 if successful
+ * \return -1 on error 0 if successful
  *
  */
-static int sendWsHandshakeReply(struct socket_connection_desc *socketClientDesc, const char *replyKey)
+static int sendWsHandshakeReply(struct socket_connection_desc *socketConnectionDesc, const char *replyKey)
 {
   char replyHeader[strlen(WS_HANDSHAKE_REPLY_BLUEPRINT) + 28];
 
@@ -247,7 +247,7 @@ static int sendWsHandshakeReply(struct socket_connection_desc *socketClientDesc,
     return -1;
   }
 
-  return socketServer_send(socketClientDesc, replyHeader, strlen(replyHeader));
+  return socketServer_send(socketConnectionDesc, replyHeader, strlen(replyHeader));
 }
 
 #define WS_HS_REPLY_ID "Sec-WebSocket-Accept:"
@@ -256,11 +256,11 @@ static int sendWsHandshakeReply(struct socket_connection_desc *socketClientDesc,
 /**
  * \brief checks if we've received the correct handshake reply
  *
- * \param *websocketDesc Pointer to the websocket descriptor
+ * \param *wsConnectionDesc Pointer to the websocket connection descriptor
  * \param *header Pointer to the header
- * \param [in-out]len input the length of the message output the length of the header
+ * \param[in-out] len Input the length of the message output the length of the header
  *
- * \return true => handshake correct else false
+ * \return True => handshake correct else false
  */
 static bool checkWsHandshakeReply(struct websocket_connection_desc *wsConnectionDesc, char *header, size_t *len)
 {
@@ -321,11 +321,11 @@ static bool checkWsHandshakeReply(struct websocket_connection_desc *wsConnection
 
 
 /**
- * \brief sends the websocket handshake request
+ * \brief Sends the websocket handshake request
  *
- * \param *wsDesc Pointer to the websocket descriptor
+ * \param *wsDesc Pointer to the websocket client descriptor
  *
- * \return true if successful else false
+ * \return True if successful else false
  */
 static bool sendWsHandshakeRequest(struct websocket_client_desc *wsDesc)
 {
@@ -411,9 +411,9 @@ struct ws_header
 };
 
 /**
- * \brief: prints the websocket header (for debugging purpose only)
+ * \brief Prints the websocket header (for debugging purpose only)
  *
- * \param *header: pointer to the header
+ * \param *header Pointer to the header
  */
 static void  __attribute__((unused)) printWsHeader(const struct ws_header *header)
 {
@@ -427,13 +427,13 @@ static void  __attribute__((unused)) printWsHeader(const struct ws_header *heade
 }
 
 /**
- * \brief: parses the header of a websocket message
+ * \brief Parses the header of a websocket message
  *
- * \param *data: pointer to the message received from the socket
- * \param len: the length of the data
- * \param *header: pointer to where the header should be written to
+ * \param *data Pointer to the message received from the socket
+ * \param len The length of the data
+ * \param[out] *header Pointer to where the header should be written to
  *
- * \return: 1 if successful 0 if msg to short else -1
+ * \return 1 if successful 0 if msg to short else -1
  */
 static int parseWebsocketHeader(const unsigned char *data, size_t len, struct ws_header *header)
 {
@@ -522,17 +522,17 @@ static int parseWebsocketHeader(const unsigned char *data, size_t len, struct ws
 }
 
 /**
- * \brief: creates the websocket header from the given variables
+ * \brief creates the websocket header from the given variables
  *
- * \param[out] *buffer: pointer to the buffer where the header should be written to
+ * \param[out] *buffer Pointer to the buffer where the header should be written to
  *                 should be able to hold at least 10 bytes
- * \param opcode: the opcode that should be used for the header
- * \param fin: fin bit (is this the last frame (true) or will more follow (false))
- * \param masked: true => add a mask, false => add no mask
- * \param mask: the mask that should be used (ignored in case masked is false)
- * \param len: the length of the payload
+ * \param opcode The opcode that should be used for the header
+ * \param fin Fin bit (is this the last frame (true) or will more follow (false))
+ * \param masked True => add a mask, false => add no mask
+ * \param mask The mask that should be used (ignored in case masked is false)
+ * \param len The length of the payload
  *
- * \return: the length of the header
+ * \return The length of the header
  */
 static int createWebsocketHeader(unsigned char *buffer, enum ws_opcode opcode, bool fin, bool masked,
                                  unsigned long mask, size_t len)
@@ -580,15 +580,15 @@ static int createWebsocketHeader(unsigned char *buffer, enum ws_opcode opcode, b
 }
 
 /**
- * \brief copies the data in the buffer pointed by from to the buffer pointed by to and mask
+ * \brief Copies the data in the buffer pointed by from to the buffer pointed by to and mask
  *        them
  *
- * \param *to pointer to where the data should copied masked
- * \param *from pointer to the original data
- * \param mask the mask that shoud be used (32-bit)
- * \param len the length of the data that should be copied
+ * \param *to Pointer to where the data should copied masked
+ * \param *from Pointer to the original data
+ * \param mask The mask that shoud be used (32-bit)
+ * \param len The length of the data that should be copied
  *
- * \note the masking algorithm is big endian XOR
+ * \note The masking algorithm is big endian XOR
  */
 static void copyMasked(unsigned char *to, const unsigned char *from, unsigned long mask, size_t len)
 {
@@ -612,14 +612,14 @@ static void copyMasked(unsigned char *to, const unsigned char *from, unsigned lo
 }
 
 /**
- * \brief: sends data through websockets with custom opcodes
+ * \brief Sends data through websockets with custom opcodes
  *
- * \param *wsConnectionDesc: pointer to the websocket connection descriptor
- * \param opcode: the opcode to use
- * \param fin: true if this is the last frame of a sequence else false
- * \param masked: true => send masked (client to server) else false (server to client)
- * \param *msg: the payload data
- * \param len: the payload length
+ * \param *wsConnectionDesc Pointer to the websocket connection descriptor
+ * \param opcode The opcode to use
+ * \param fin True if this is the last frame of a sequence else false
+ * \param masked True => send masked (client to server) else false (server to client)
+ * \param *msg The payload data
+ * \param len The payload length
  *
  * \return 0 if successful else -1
  */
@@ -676,11 +676,11 @@ static int sendDataLowLevel(struct websocket_connection_desc *wsConnectionDesc, 
 }
 
 /**
- * \brief: checks if the given close code is valid
+ * \brief Checks if the given close code is valid
  *
- * \param code: the code that should be checked
+ * \param code The code that should be checked
  *
- * \return: true if code is valid else false
+ * \return True if code is valid else false
  */
 static bool checkCloseCode(enum ws_close_code code)
 {
@@ -718,13 +718,13 @@ enum ws_msg_state
 };
 
 /**
- * \brief: handles the first message (which is sometimes followed by a cont message)
+ * \brief Handles the first message (which is sometimes followed by a cont message)
  *
- * \param *wsConnectionDesc: pointer to the websocket connection descriptor
- * \param *data: pointer to the payload data
- * \param *header: pointer to the parsed websocket header structure
+ * \param *wsConnectionDesc Pointer to the websocket connection descriptor
+ * \param *data Pointer to the payload data
+ * \param *header Pointer to the parsed websocket header structure
  *
- * \return: the message state
+ * \return The message state
  */
 static enum ws_msg_state handleFirstMessage(struct websocket_connection_desc *wsConnectionDesc, const unsigned char *data,
                                             struct ws_header *header)
@@ -795,13 +795,13 @@ static enum ws_msg_state handleFirstMessage(struct websocket_connection_desc *ws
 }
 
 /**
- * \brief: handles a cont message
+ * \brief Handles a cont message
  *
- * \param *wsConnectionDesc: pointer to the websocket connection descriptor
- * \param *data: pointer to the payload data
- * \param *header: pointer to the parsed websocket header structure
+ * \param *wsConnectionDesc Pointer to the websocket connection descriptor
+ * \param *data Pointer to the payload data
+ * \param *header Pointer to the parsed websocket header structure
  *
- * \return: the message state
+ * \return The message state
  */
 static enum ws_msg_state handleContMessage(struct websocket_connection_desc *wsConnectionDesc, const unsigned char *data,
                                            struct ws_header *header)
@@ -889,13 +889,13 @@ static enum ws_msg_state handleContMessage(struct websocket_connection_desc *wsC
 }
 
 /**
- * \brief: handles a ping message and replies with a pong message
+ * \brief Handles a ping message and replies with a pong message
  *
- * \param *wsConnectionDesc: pointer to the websocket client descriptor
- * \param *data: pointer to the payload data
- * \param *header: pointer to the parsed websocket header structure
+ * \param *wsConnectionDesc Pointer to the websocket connection descriptor
+ * \param *data Pointer to the payload data
+ * \param *header Pointer to the parsed websocket header structure
  *
- * \return: the message state
+ * \return The message state
  */
 static enum ws_msg_state handlePingMessage(struct websocket_connection_desc *wsConnectionDesc, const unsigned char *data,
                                            struct ws_header *header)
@@ -955,15 +955,15 @@ static enum ws_msg_state handlePingMessage(struct websocket_connection_desc *wsC
 }
 
 /**
- * \brief: handles a pong message
+ * \brief Handles a pong message
  *
- * \param *wsClientDesc: pointer to the websocket client descriptor
- * \param *data: pointer to the payload data
- * \param *header: pointer to the parsed websocket header structure
+ * \param *wsConnectionDesc Pointer to the websocket connection descriptor
+ * \param *data Pointer to the payload data
+ * \param *header Pointer to the parsed websocket header structure
  *
- * \return: the message state
+ * \return the message state
  */
-static enum ws_msg_state handlePongMessage(struct websocket_connection_desc *wsClientDesc, const unsigned char *data,
+static enum ws_msg_state handlePongMessage(struct websocket_connection_desc *wsConnectionDesc, const unsigned char *data,
                                            struct ws_header *header)
 {
   (void) data;
@@ -975,19 +975,19 @@ static enum ws_msg_state handlePongMessage(struct websocket_connection_desc *wsC
   }
   else
   {
-    websocket_closeConnection(wsClientDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
+    websocket_closeConnection(wsConnectionDesc, WS_CLOSE_CODE_PROTOCOL_ERROR);
     return WS_MSG_STATE_ERROR;
   }
 }
 
 /**
- * \brief: handles a disconnect message and replies with a disconnect message
+ * \brief handles a disconnect message and replies with a disconnect message
  *
- * \param *wsClientDesc: pointer to the websocket client descriptor
- * \param *data: pointer to the payload data
- * \param *header: pointer to the parsed websocket header structure
+ * \param *wsConnectionDesc Pointer to the websocket connection descriptor
+ * \param *data Pointer to the payload data
+ * \param *header Pointer to the parsed websocket header structure
  *
- * \return: the message state
+ * \return the message state
  */
 static enum ws_msg_state handleDisconnectMessage(struct websocket_connection_desc *wsConnectionDesc,
                                                  const unsigned char *data, struct ws_header *header)
@@ -1077,14 +1077,14 @@ static enum ws_msg_state handleDisconnectMessage(struct websocket_connection_des
 }
 
 /**
- * \brief: parses a message and stores it to the client descriptor
+ * \brief parses a message and stores it to the client descriptor
  *
- * \param *wsConnectionDesc: pointer to the websocket connection descriptor
- * \param *data: pointer to the received data
- * \param len: the length of the data
- * \param header: the parsed header struct (as parsed by parseWebsocketHeader)
+ * \param *wsConnectionDesc Pointer to the websocket connection descriptor
+ * \param *data Pointer to the received data
+ * \param len The length of the data
+ * \param header The parsed header struct (as parsed by parseWebsocketHeader)
  *
- * \return one of ws_msg_state
+ * \return One of WS_MSG_STATE_x
  */
 static enum ws_msg_state parseMessage(struct websocket_connection_desc *wsConnectionDesc, const unsigned char *data,
                                       size_t len, struct ws_header *header)
@@ -1126,15 +1126,15 @@ static enum ws_msg_state parseMessage(struct websocket_connection_desc *wsConnec
 }
 
 /**
- * \brief: function that gets called when a connection to a client is established
+ * \brief Function that gets called when a connection to a client is established
  *         allocates and initialises the wsClientDesc
  *
- * \param *socketUserData: in this case this is the websocket descriptor
- * \param *socketSesionDesc: the client descriptor from the socket server
+ * \param *socketUserData: In this case this is the websocket descriptor
+ * \param *socketConnectionDesc The connection descriptor from the socket server
  *
- * \return: pointer to the websocket connection descriptor
+ * \return Pointer to the websocket connection descriptor
  */
-static void* websocketServer_onOpen(void *socketUserData, struct socket_connection_desc *socketSesionDesc)
+static void* websocketServer_onOpen(void *socketUserData, struct socket_connection_desc *socketConnectionDesc)
 {
   struct websocket_server_desc *wsDesc = socketUserData;
   struct websocket_connection_desc *wsConnectionDesc;
@@ -1145,17 +1145,17 @@ static void* websocketServer_onOpen(void *socketUserData, struct socket_connecti
     return NULL;
   }
 
-  if(socketSesionDesc == NULL)
+  if(socketConnectionDesc == NULL)
   {
     log_err("%s(): socketClientDesc must not be NULL!", __func__);
     return NULL;
   }
 
-  refcnt_ref(socketSesionDesc);
+  refcnt_ref(socketConnectionDesc);
   wsConnectionDesc = refcnt_allocate(sizeof(struct websocket_connection_desc), NULL);
   memset(wsConnectionDesc, 0, sizeof(struct websocket_connection_desc));
   wsConnectionDesc->wsType = WS_TYPE_SERVER;
-  wsConnectionDesc->socketClientDesc = socketSesionDesc;
+  wsConnectionDesc->socketClientDesc = socketConnectionDesc;
   wsConnectionDesc->state = WS_STATE_HANDSHAKE;
   wsConnectionDesc->timeout.tv_nsec = 0;
   wsConnectionDesc->timeout.tv_sec = 0;
@@ -1175,11 +1175,13 @@ static void* websocketServer_onOpen(void *socketUserData, struct socket_connecti
 }
 
 /**
- * \brief function that get's called when a websocket client connection is
+ * \brief Function that get's called when a websocket client connection is
  *        established
  *
  * \param *socketUserData In this case this is the websocket descriptor
  * \param *socketDesc The socket descriptor of the socket client
+ *
+ * \return Pointer to the websocket connection descriptor
  */
 static void* websocketClient_onOpen(void *socketUserData, void *socketDesc)
 {
@@ -1204,7 +1206,7 @@ static void* websocketClient_onOpen(void *socketUserData, void *socketDesc)
 /**
  * \brief gets called when the websocket is closed
  *
- * \param *wsConnectionDesc pointer to the websocket connection descriptor
+ * \param *wsConnectionDesc Pointer to the websocket connection descriptor
  */
 static void callOnClose(struct websocket_connection_desc *wsConnectionDesc)
 {
@@ -1233,18 +1235,18 @@ static void callOnClose(struct websocket_connection_desc *wsConnectionDesc)
 }
 
 /**
- * \brief: function that gets called when a connection to a client is closed
+ * \brief function that gets called when a connection to a client is closed
  *         frees the websocket client descriptor
  *
- * \param *socketUserData: in this case this is the websocket descriptor
- * \param *socketClientDesc: the client descriptor from the socket server
- * \param *connectionDescriptor: in this case this is the websocket connection descriptor
+ * \param *socketUserData The websocket descriptor
+ * \param *socketClientDesc The connection descriptor from the socket server/client
+ * \param *wsConnectionDescriptor The websocket connection descriptor
  *
  */
-static void websocket_onClose(void *socketUserData, void *socketConnectionDesc, void *connectionDescriptor)
+static void websocket_onClose(void *socketUserData, void *socketConnectionDesc, void *wsConnectionDescriptor)
 {
   struct websocket_desc *wsDesc = socketUserData;
-  struct websocket_connection_desc *wsConnectionDesc = connectionDescriptor;
+  struct websocket_connection_desc *wsConnectionDesc = wsConnectionDescriptor;
   (void)socketConnectionDesc;
 
   if(wsDesc == NULL)
@@ -1282,9 +1284,9 @@ static void websocket_onClose(void *socketUserData, void *socketConnectionDesc, 
 }
 
 /**
- * \brief gets called when a message was received on the websocket
+ * \brief Gets called when a message was received on the websocket
  *
- * \param *wsConnectionDesc pointer to the websocket connection descriptor
+ * \param *wsConnectionDesc Pointer to the websocket connection descriptor
  */
 static void callOnMessage(struct websocket_connection_desc *wsConnectionDesc)
 {
@@ -1315,15 +1317,15 @@ static void callOnMessage(struct websocket_connection_desc *wsConnectionDesc)
 }
 
 /**
- * \brief: function that gets called when a message arrives at the socket server
+ * \brief Function that gets called when a message arrives at the socket server
  *
- * \param *socketUserData: in this case this is the websocket descriptor
- * \param *socketConnectionDesc: the descriptor of the underlying socket
- * \param *connectionDescriptor: in this case this is the websocket connection descriptor
- * \param *msg: pointer to the buffer containing the data
- * \param len: the length of msg
+ * \param *socketUserData In this case this is the websocket descriptor
+ * \param *socketConnectionDesc The descriptor of the underlying socket
+ * \param *connectionDescriptor The websocket connection descriptor
+ * \param *msg Pointer to the buffer containing the data
+ * \param len The length of msg
  *
- * \return: the amount of bytes read
+ * \return the amount of bytes read
  *
  */
 static size_t websocket_onMessage(void *socketUserData, void *socketConnectionDesc, void *connectionDescriptor, void *msg, size_t len)
@@ -1484,12 +1486,32 @@ static size_t websocket_onMessage(void *socketUserData, void *socketConnectionDe
 }
 
 /**
- * \brief: sends binary or text data through websockets
+ * \brief Frees the client descriptor
  *
- * \param *wsConnectionDesc: pointer to the websocket connection descriptor
- * \param dataType: the datatype (WS_DATA_TYPE_BINARY or WS_DATA_TYPE_TEXT)
- * \param *msg: the payload data
- * \param len: the payload length
+ * \param *wsClientDesc Pointer to the websocket client descriptor
+ */
+static void freeClientDesc(void *wsCLientDesc)
+{
+  struct websocket_client_desc *wsDesc;
+
+  if(wsDesc->socketDesc != NULL)
+  {
+    socketClient_close(wsDesc->socketDesc);
+    wsDesc->socketDesc = NULL;
+  }
+  free(wsDesc->address);
+  free(wsDesc->port);
+  free(wsDesc->endpoint);
+  free(wsDesc->wsKey);
+}
+
+/**
+ * \brief Sends binary or text data through websockets
+ *
+ * \param *wsConnectionDesc Pointer to the websocket connection descriptor
+ * \param dataType The datatype (WS_DATA_TYPE_BINARY or WS_DATA_TYPE_TEXT)
+ * \param *msg The payload data
+ * \param len The payload length
  *
  * \return 0 if successful else -1
  *
@@ -1521,13 +1543,13 @@ int websocket_sendData(struct websocket_connection_desc *wsConnectionDesc, enum 
 }
 
 /**
- * \brief: sends fragmented binary or text data through websockets
+ * \brief Sends fragmented binary or text data through websockets
  *         use websocket_sendDataFragmetedCont for further fragments
  *
- * \param *wsConnectionDescriptor: pointer to the websocket connection descriptor
- * \param dataType: the datatype (WS_DATA_TYPE_BINARY or WS_DATA_TYPE_TEXT)
- * \param *msg: the payload data
- * \param len: the payload length
+ * \param *wsConnectionDescriptor Pointer to the websocket connection descriptor
+ * \param dataType The datatype (WS_DATA_TYPE_BINARY or WS_DATA_TYPE_TEXT)
+ * \param *msg The payload data
+ * \param len The payload length
  *
  * \return 0 if successful else -1
  *
@@ -1560,13 +1582,13 @@ int websocket_sendDataFragmentedStart(struct websocket_connection_desc *wsConnec
 }
 
 /**
- * \brief: continues a fragmented send
+ * \brief Continues a fragmented send
  *         use sendDataFragmentedStop to stop the transmission
  *
- * \param *wsConnectionDesc: pointer to the websocket connection descriptor
- * \param fin: true => this is the last fragment else false
- * \param *msg: the payload data
- * \param len: the payload length
+ * \param *wsConnectionDesc Pointer to the websocket connection descriptor
+ * \param fin True => this is the last fragment else false
+ * \param *msg The payload data
+ * \param len The payload length
  *
  * \return 0 if successful else -1
  *
@@ -1583,10 +1605,10 @@ int websocket_sendDataFragmentedCont(struct websocket_connection_desc *wsConnect
 }
 
 /**
- * \brief: closes the given websocket connection
+ * \brief Closes the given websocket connection
  *
- * \param *wsConnectionDesc: pointer to the websocket connection descriptor
- * \param code: the closing code
+ * \param *wsConnectionDesc Pointer to the websocket connection descriptor
+ * \param code The closing code
  */
 void websocket_closeConnection(struct websocket_connection_desc *wsConnectionDesc, enum ws_close_code code)
 {
@@ -1620,9 +1642,11 @@ void websocket_closeConnection(struct websocket_connection_desc *wsConnectionDes
 }
 
 /**
- * \brief: returns the user data of the given client
+ * \brief returns the user data of the given client
  *
- * \param *wsConnectionDesc: pointer to the websocket client descriptor
+ * \param *wsConnectionDesc Pointer to the websocket client descriptor
+ *
+ * \ŗeturn The user data of the given connection
  *
  */
 void* websocket_getConnectionUserData(struct websocket_connection_desc *wsConnectionDesc)
@@ -1631,12 +1655,14 @@ void* websocket_getConnectionUserData(struct websocket_connection_desc *wsConnec
 }
 
 /**
- * \brief: opens a websocket server
+ * \brief opens a websocket server
  *
- * \param wsInit: pointer to the init struct
- * \param websocketUserData: userData for the socket
+ * \param *wsInit Pointer to the init struct
+ * \param *websocketUserData userData for the socket
  *
- * \return: the websocket descriptor or NULL in case of error
+ * \return The websocket descriptor or NULL in case of error
+ *         it can be passed to websocket_ref if it is used
+ *         at more places
  */
 struct websocket_server_desc *websocketServer_open(struct websocket_server_init *wsInit, void *websocketUserData)
 {
@@ -1675,9 +1701,10 @@ struct websocket_server_desc *websocketServer_open(struct websocket_server_init 
 }
 
 /**
- * \brief: closes the given websocket server
+ * \brief closes the given websocket server
+ *        and decreases the reference counter of wsDesc by 1
  *
- * \param *wsDesc: pointer to the websocket descriptor
+ * \param *wsDesc Pointer to the websocket descriptor
  *
  */
 void websocketServer_close(struct websocket_server_desc *wsDesc)
@@ -1690,17 +1717,20 @@ void websocketServer_close(struct websocket_server_desc *wsDesc)
 /**
  * \brief opens a websocket client connection
  *
- * \param wsInit: pointer to the init struct
- * \param websocketUserData: userData for the socket
+ * \param wsInit Pointer to the init struct
+ * \param websocketUserData UserData for the socket
  *
- * \return: the websocket client descriptor or NULL in case of error
+ * \return The websocket client descriptor or NULL in case of error
+ *         it can be passed to websocket_ref if it is used
+ *         at more places
  */
 struct websocket_connection_desc *websocketClient_open(struct websocket_client_init *wsInit, void *websocketUserData)
 {
   struct socket_client_init socketInit;
   struct websocket_client_desc *wsDesc;
 
-  wsDesc = refcnt_allocate(sizeof(struct websocket_client_desc), NULL);
+  //TODO is it necessary to refcnt_allocate or is malloc enough?
+  wsDesc = refcnt_allocate(sizeof(struct websocket_client_desc), freeClientDesc);
   if(wsDesc == NULL)
   {
     log_err("refcnt_allocate failed");
@@ -1714,6 +1744,7 @@ struct websocket_connection_desc *websocketClient_open(struct websocket_client_i
   wsDesc->ws_onOpen = wsInit->ws_onOpen;
   wsDesc->ws_onClose = wsInit->ws_onClose;
   wsDesc->ws_onMessage = wsInit->ws_onMessage;
+  //TODO connection must be allocated with ref_cnt_allocate
   wsDesc->connection.wsType = WS_TYPE_CLIENT;
   wsDesc->connection.state = WS_STATE_HANDSHAKE;
   wsDesc->connection.lastMessage.firstReceived = false;
@@ -1788,7 +1819,8 @@ struct websocket_connection_desc *websocketClient_open(struct websocket_client_i
 }
 
 /**
- * \brief closes a websocket client
+ * \brief Closes a websocket client
+ *        and decreases the reference counter of wsConnectionDesc by 1
  *
  * \param *wsConnectionDesc Pointer to the websocket client descriptor
  */
@@ -1808,23 +1840,15 @@ void websocketClient_close(struct websocket_connection_desc *wsConnectionDesc)
     wsDesc->socketDesc = NULL;
   }
   wsDesc->connection.state = WS_STATE_CLOSED;
-  free(wsDesc->address);
-  wsDesc->address = NULL;
-  free(wsDesc->port);
-  wsDesc->port = NULL;
-  free(wsDesc->endpoint);
-  wsDesc->endpoint = NULL;
-  free(wsDesc->wsKey);
-  wsDesc->wsKey = NULL;
   refcnt_unref(wsDesc);
 }
 
 /**
- * \brief returns if the client is still connected
+ * \brief Returns if the client is still connected
  *
  * \param *wsConnectionDesc Pointer to the websocket connection descriptor
  *
- * \return true => connected else false
+ * \return True => connected else false
  */
 bool websocketConnection_isConnected(struct websocket_connection_desc *wsConnectionDesc)
 {
@@ -1832,9 +1856,9 @@ bool websocketConnection_isConnected(struct websocket_connection_desc *wsConnect
 }
 
 /**
- * \brief: increments the reference count of the given object
+ * \brief increments the reference count of the given object
  *
- * \param *ptr: poiner to the object
+ * \param *ptr Poiner to the object
  */
 void websocket_ref(void *ptr)
 {
@@ -1842,9 +1866,9 @@ void websocket_ref(void *ptr)
 }
 
 /**
- * \brief: decrements the reference count of the given object and frees it if necessary
+ * \brief Decrements the reference count of the given object and frees it if necessary
  *
- * \param *ptr: poiner to the object
+ * \param *ptr Pointer to the object
  */
 void websocket_unref(void *ptr)
 {
@@ -1854,14 +1878,14 @@ void websocket_unref(void *ptr)
 /* ------------------------------ LEGACY FUNCTIONS ------------------------------ */
 
 /**
- * \brief: opens a websocket server
+ * \brief Opens a websocket server
  *
- * \param wsInit: pointer to the init struct
- * \param websocketUserData: userData for the socket
+ * \param wsInit Pointer to the init struct
+ * \param websocketUserData UserData for the socket
  *
- * \return: the websocket descriptor or NULL in case of error
+ * \return The websocket descriptor or NULL in case of error
  *
- * \note this function is for backward compatibility
+ * \note LEGACY!!! This function is for backward compatibility
  *       it should not be used anymore but will not be
  *       removed unless there's a good reason
  */
@@ -1903,9 +1927,9 @@ void *websocket_open(struct websocket_init *wsInit, void *websocketUserData)
 }
 
 /**
- * \brief: closes the given websocket server
+ * \brief Closes the given websocket server
  *
- * \param *wsDesc: pointer to the websocket descriptor
+ * \param *wsDesc Pointer to the websocket descriptor
  *
  * \note LEGACY!!! This function is for backward compatibility
  *       it should not be used anymore but will not be
@@ -1917,9 +1941,9 @@ void websocket_close(void *wsDesc)
 }
 
 /**
- * \brief: returns the user data of the given connection
+ * \brief Returns the user data of the given connection
  *
- * \param *wsClientDesc: pointer to the websocket client descriptor
+ * \param *wsClientDesc Pointer to the websocket client descriptor
  *
  * \note LEGACY!!! This function is for backward compatibility
  *       it should not be used anymore but will not be

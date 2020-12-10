@@ -48,7 +48,7 @@ void onClose(void *socketUserData, struct websocket_connection_desc *connectionD
 }
 
 /**
- * \brief this runs the test as required by the autobahn testsuite
+ * \brief This runs the test as required by the autobahn testsuite
  */
 void runTest(void)
 {
@@ -101,7 +101,7 @@ void runTest(void)
 }
 
 /**
- * \brief the main function
+ * \brief The main function
  */
 int main(int argc, char *argv[])
 {

@@ -48,11 +48,11 @@ void* onOpen(void *websocketUserData, struct websocket_server_desc *wsDesc,
   printf("%s()\n", __func__);
 
   //you can return user data here which is then
-  //passed to onMessage as clientUserData
+  //passed to onMessage as connectionUserData
   return NULL;
 }
 
-void onMessage(void *websocketUserData, struct websocket_connection_desc *connectionDesc, void *clientUserData,
+void onMessage(void *websocketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData,
                enum ws_data_type dataType, void *msg, size_t len)
 {
   printf("%s()\n", __func__);
@@ -60,11 +60,12 @@ void onMessage(void *websocketUserData, struct websocket_connection_desc *connec
   {
     printf("received:%s\n", (char*)msg);
   }
+  // echo the received data
   websocket_sendData(connectionDesc, dataType, msg, len);
 }
 
 void onClose(struct websocket_server_desc *wsDesc, void *websocketUserData,
-             struct websocket_connection_desc *connectionDesc, void *userData)
+             struct websocket_connection_desc *connectionDesc, void *connectionUserData)
 {
   printf("%s()\n", __func__);
 }
@@ -72,9 +73,7 @@ void onClose(struct websocket_server_desc *wsDesc, void *websocketUserData,
 int main(int argc, char *argv[])
 {
   struct websocket_server_init websocketInit;
-  void *wsDesc;
-
-  const char *sendText = "Hello World From Ezwebsocket";
+  struct websocket_server_desc *wsServerDesc;
 
   websocketInit.port = "9001";
   websocketInit.address = "0.0.0.0";
@@ -82,18 +81,16 @@ int main(int argc, char *argv[])
   websocketInit.ws_onClose = onClose;
   websocketInit.ws_onMessage = onMessage;
 
-  wsDesc = websocketServer_open(&websocketInit, NULL);
-  if(wsDesc == NULL)
+  wsServerDesc = websocketServer_open(&websocketInit, NULL);
+  if(wsServerDesc == NULL)
     return -1;
 
   for(;;)
   {
-    //send "Hello World From Ezwebsocket" every second
-    websocket_sendData(wsDesc, WS_DATA_TYPE_TEXT, sendText, strlen(sendText) + 1);
     sleep(1);
   }
 
-  websocketServer_close(wsDesc);
+  websocketServer_close(wsServerDesc);
 
   return 0;
 }
@@ -148,7 +145,7 @@ void onClose(void *socketUserData, struct websocket_connection_desc *connectionD
 int main(int argc, char *argv[])
 {
   struct websocket_client_init websocketInit;
-  void *wsDesc;
+  struct websocket_connection_desc *wsConnectionDesc;
 
   const char *sendText = "Hello World From Ezwebsocket";
 
@@ -158,18 +155,18 @@ int main(int argc, char *argv[])
   websocketInit.ws_onClose = onClose;
   websocketInit.ws_onMessage = onMessage;
 
-  wsDesc = websocketClient_open(&websocketInit, NULL);
-  if(wsDesc == NULL)
+  wsConnectionDesc = websocketClient_open(&websocketInit, NULL);
+  if(wsConnectionDesc == NULL)
     return -1;
 
   for(unsigned long i = 0; i < 10; i++)
   {
     //send "Hello World From Ezwebsocket" every second
-    websocket_sendData(wsDesc, WS_DATA_TYPE_TEXT, sendText, strlen(sendText) + 1);
+    websocket_sendData(wsConnectionDesc, WS_DATA_TYPE_TEXT, sendText, strlen(sendText) + 1);
     sleep(1);
   }
 
-  websocketClient_close(wsDesc);
+  websocketClient_close(wsConnectionDesc);
 
   return 0;
 }
@@ -187,7 +184,7 @@ Download the Autobahn docker image from:
 
 Create a directory for the binary:
 
-mkdir -p tests/bin
+$> mkdir -p tests/bin
 
 Compile test with:
 
@@ -207,7 +204,7 @@ You will then find the report at tests/reports/clients/index.html
 
 Create a directory for the binary:
 
-mkdir -p tests/bin
+$> mkdir -p tests/bin
 
 Compile test with:
 
