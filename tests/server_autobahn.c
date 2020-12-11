@@ -41,7 +41,7 @@ void onClose(struct websocket_server_desc *wsDesc, void *socketUserData,
 int main(int argc, char *argv[])
 {
   struct websocket_server_init websocketInit;
-  void *wsDesc;
+  struct websocket_server_desc *wsDesc;
 
   signal(SIGINT, sigIntHandler);
 

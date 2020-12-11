@@ -53,7 +53,7 @@ void onClose(void *socketUserData, struct websocket_connection_desc *connectionD
 void runTest(void)
 {
   struct websocket_client_init websocketInit;
-  void *wsDesc;
+  struct websocket_connection_desc *wsConnectionDesc;
 
   websocketInit.port = "9001";
   websocketInit.address = "127.0.0.1";
@@ -75,12 +75,12 @@ void runTest(void)
       asprintf((char**)&websocketInit.endpoint, "/runCase?case=%u&agent=EZwebsocket", currentTestNum);
     }
 
-    wsDesc = websocketClient_open(&websocketInit, NULL);
+    wsConnectionDesc = websocketClient_open(&websocketInit, NULL);
 
-    while(websocketConnection_isConnected(wsDesc))
+    while(websocketConnection_isConnected(wsConnectionDesc))
       usleep(100000);
 
-    websocketClient_close(wsDesc);
+    websocketClient_close(wsConnectionDesc);
 
     currentTestNum++;
 
@@ -89,12 +89,12 @@ void runTest(void)
 
   websocketInit.endpoint = "/updateReports?agent=EZwebsocket";
 
-  wsDesc = websocketClient_open(&websocketInit, NULL);
+  wsConnectionDesc = websocketClient_open(&websocketInit, NULL);
 
-  while(websocketConnection_isConnected(wsDesc))
+  while(websocketConnection_isConnected(wsConnectionDesc))
     usleep(100000);
 
-  websocketClient_close(wsDesc);
+  websocketClient_close(wsConnectionDesc);
 
   currentTestNum = 0;
   numberOfTestCases = 0;

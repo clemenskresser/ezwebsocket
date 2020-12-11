@@ -134,7 +134,7 @@ struct websocket_client_desc
   //! pointer to the user data
   void *wsUserData;
   //! the websocket connection descriptor for the current connection
-  struct websocket_connection_desc connection;
+  struct websocket_connection_desc *connection;
   //! the address of the host
   char *address;
   //! the port of the websocket host
@@ -327,12 +327,13 @@ static bool checkWsHandshakeReply(struct websocket_connection_desc *wsConnection
  *
  * \return True if successful else false
  */
-static bool sendWsHandshakeRequest(struct websocket_client_desc *wsDesc)
+static bool sendWsHandshakeRequest(struct websocket_connection_desc *wsConnectionDesc)
 {
   unsigned char wsKeyBytes[16];
   unsigned long i;
   char *requestHeader = NULL;
   bool success = false;
+  struct websocket_client_desc *wsDesc = wsConnectionDesc->wsDesc.wsClientDesc;
 
   for(i = 0; i < sizeof(wsKeyBytes); i++)
   {
@@ -351,7 +352,7 @@ static bool sendWsHandshakeRequest(struct websocket_client_desc *wsDesc)
     goto EXIT;
   }
 
-  if(socketClient_send(wsDesc->socketDesc, requestHeader, strlen(requestHeader)) == -1)
+  if(socketClient_send(wsConnectionDesc->socketClientDesc, requestHeader, strlen(requestHeader)) == -1)
   {
     log_err("socketClient_send failed");
     goto EXIT;
@@ -663,7 +664,7 @@ static int sendDataLowLevel(struct websocket_connection_desc *wsConnectionDesc, 
       break;
 
     case WS_TYPE_CLIENT:
-      rc = socketClient_send(wsConnectionDesc->wsDesc.wsClientDesc->socketDesc, sendBuffer, len + headerLength);
+      rc = socketClient_send(wsConnectionDesc->socketClientDesc, sendBuffer, len + headerLength);
       break;
   }
   free(sendBuffer);
@@ -1185,22 +1186,23 @@ static void* websocketServer_onOpen(void *socketUserData, struct socket_connecti
  */
 static void* websocketClient_onOpen(void *socketUserData, void *socketDesc)
 {
-  struct websocket_client_desc *wsDesc = socketUserData;
+  struct websocket_connection_desc *wsConnectionDesc = socketUserData;
+  struct websocket_client_desc *wsDesc = wsConnectionDesc->wsDesc.wsClientDesc;
   (void)socketDesc;
 
   if(wsDesc->ws_onOpen != NULL)
-    wsDesc->connection.connectionUserData = wsDesc->ws_onOpen( wsDesc->wsUserData, wsDesc, &wsDesc->connection);
+    wsConnectionDesc->connectionUserData = wsDesc->ws_onOpen( wsDesc->wsUserData, wsDesc, wsDesc->connection);
   else
-    wsDesc->connection.connectionUserData = NULL;
+    wsConnectionDesc->connectionUserData = NULL;
 
-  if(!sendWsHandshakeRequest(wsDesc))
+  if(!sendWsHandshakeRequest(wsConnectionDesc))
   {
     if(wsDesc->ws_onClose != NULL)
-      wsDesc->ws_onClose(wsDesc->wsUserData, &wsDesc->connection, wsDesc->connection.connectionUserData);
-    wsDesc->connection.state = WS_STATE_CLOSED;
+      wsDesc->ws_onClose(wsDesc->wsUserData, wsDesc->connection, wsConnectionDesc->connectionUserData);
+    wsConnectionDesc->state = WS_STATE_CLOSED;
   }
 
-  return &wsDesc->connection;
+  return wsDesc->connection;
 }
 
 /**
@@ -1245,15 +1247,9 @@ static void callOnClose(struct websocket_connection_desc *wsConnectionDesc)
  */
 static void websocket_onClose(void *socketUserData, void *socketConnectionDesc, void *wsConnectionDescriptor)
 {
-  struct websocket_desc *wsDesc = socketUserData;
+  (void) socketUserData;
   struct websocket_connection_desc *wsConnectionDesc = wsConnectionDescriptor;
   (void)socketConnectionDesc;
-
-  if(wsDesc == NULL)
-  {
-    log_err("%s(): wsDesc must not be NULL!", __func__);
-    return;
-  }
 
   if(wsConnectionDesc == NULL)
   {
@@ -1330,7 +1326,7 @@ static void callOnMessage(struct websocket_connection_desc *wsConnectionDesc)
  */
 static size_t websocket_onMessage(void *socketUserData, void *socketConnectionDesc, void *connectionDescriptor, void *msg, size_t len)
 {
-  struct websocket_desc *wsDesc = socketUserData;
+  (void)socketUserData;
   struct websocket_connection_desc *wsConnectionDesc = connectionDescriptor;
   struct ws_header wsHeader = {0};
   struct timespec now;
@@ -1338,15 +1334,9 @@ static size_t websocket_onMessage(void *socketUserData, void *socketConnectionDe
   char key[WS_HS_KEY_LEN];
   char *replyKey;
 
-  if(wsDesc == NULL)
-  {
-    log_err("%s(): wsDesc must not be NULL!", __func__);
-    return 0;
-  }
-
   if(wsConnectionDesc == NULL)
   {
-    log_err("%s(): wsClientDesc must not be NULL!", __func__);
+    log_err("%s(): wsConnectionDesc must not be NULL!", __func__);
     return 0;
   }
 
@@ -1485,24 +1475,41 @@ static size_t websocket_onMessage(void *socketUserData, void *socketConnectionDe
   return 0;
 }
 
-/**
- * \brief Frees the client descriptor
- *
- * \param *wsClientDesc Pointer to the websocket client descriptor
- */
-static void freeClientDesc(void *wsCLientDesc)
-{
-  struct websocket_client_desc *wsDesc;
 
-  if(wsDesc->socketDesc != NULL)
+/**
+ * \brief frees the given connection
+ *
+ * \param *connection pointer to the websocket connection descriptor
+ *
+ * \note this function is passed to refcnt_allocate to free the connection in
+ *       case of websocket client
+ */
+static void freeConnection(void *connection)
+{
+  struct websocket_connection_desc *wsConnectionDesc = connection;
+
+  if(wsConnectionDesc == NULL)
+    return;
+
+  if(wsConnectionDesc->wsDesc.wsClientDesc != NULL)
   {
-    socketClient_close(wsDesc->socketDesc);
-    wsDesc->socketDesc = NULL;
+    if(wsConnectionDesc->socketClientDesc != NULL)
+    {
+      socketClient_close(wsConnectionDesc->socketClientDesc);
+      wsConnectionDesc->socketClientDesc = NULL;
+    }
+
+    free(wsConnectionDesc->wsDesc.wsClientDesc->address);
+    wsConnectionDesc->wsDesc.wsClientDesc->address = NULL;
+    free(wsConnectionDesc->wsDesc.wsClientDesc->port);
+    wsConnectionDesc->wsDesc.wsClientDesc->port = NULL;
+    free(wsConnectionDesc->wsDesc.wsClientDesc->endpoint);
+    wsConnectionDesc->wsDesc.wsClientDesc->endpoint = NULL;
+    free(wsConnectionDesc->wsDesc.wsClientDesc->wsKey);
+    wsConnectionDesc->wsDesc.wsClientDesc->wsKey = NULL;
+    free(wsConnectionDesc->wsDesc.wsClientDesc);
+    wsConnectionDesc->wsDesc.wsClientDesc = NULL;
   }
-  free(wsDesc->address);
-  free(wsDesc->port);
-  free(wsDesc->endpoint);
-  free(wsDesc->wsKey);
 }
 
 /**
@@ -1713,7 +1720,6 @@ void websocketServer_close(struct websocket_server_desc *wsDesc)
   refcnt_unref(wsDesc);
 }
 
-
 /**
  * \brief opens a websocket client connection
  *
@@ -1727,49 +1733,52 @@ void websocketServer_close(struct websocket_server_desc *wsDesc)
 struct websocket_connection_desc *websocketClient_open(struct websocket_client_init *wsInit, void *websocketUserData)
 {
   struct socket_client_init socketInit;
-  struct websocket_client_desc *wsDesc;
+  struct websocket_connection_desc *wsConnection;
 
-  //TODO is it necessary to refcnt_allocate or is malloc enough?
-  wsDesc = refcnt_allocate(sizeof(struct websocket_client_desc), freeClientDesc);
-  if(wsDesc == NULL)
+  wsConnection = refcnt_allocate(sizeof(struct websocket_connection_desc), freeConnection);
+  if(wsConnection == NULL)
   {
-    log_err("refcnt_allocate failed");
-    return NULL;
+    goto ERROR;
   }
+  memset(wsConnection, 0, sizeof(struct websocket_connection_desc));
 
-  memset(wsDesc, 0, sizeof(struct websocket_client_desc));
+  wsConnection->wsType = WS_TYPE_CLIENT;
+  wsConnection->state = WS_STATE_HANDSHAKE;
+  wsConnection->lastMessage.firstReceived = false;
+  wsConnection->lastMessage.complete = false;
+  wsConnection->lastMessage.data = NULL;
+  wsConnection->lastMessage.len = 0;
+  wsConnection->timeout.tv_nsec = 0;
+  wsConnection->timeout.tv_sec = 0;
+  wsConnection->connectionUserData = NULL;
+  wsConnection->wsDesc.wsClientDesc = malloc(sizeof(struct websocket_client_desc));
+  if(wsConnection->wsDesc.wsClientDesc == NULL)
+  {
+    goto ERROR;
+  }
+  memset(wsConnection->wsDesc.wsClientDesc, 0, sizeof(struct websocket_client_desc));
 
-  wsDesc->socketDesc = NULL;
-  wsDesc->wsUserData = websocketUserData;
-  wsDesc->ws_onOpen = wsInit->ws_onOpen;
-  wsDesc->ws_onClose = wsInit->ws_onClose;
-  wsDesc->ws_onMessage = wsInit->ws_onMessage;
-  //TODO connection must be allocated with ref_cnt_allocate
-  wsDesc->connection.wsType = WS_TYPE_CLIENT;
-  wsDesc->connection.state = WS_STATE_HANDSHAKE;
-  wsDesc->connection.lastMessage.firstReceived = false;
-  wsDesc->connection.lastMessage.complete = false;
-  wsDesc->connection.lastMessage.data = NULL;
-  wsDesc->connection.lastMessage.len = 0;
-  wsDesc->connection.timeout.tv_nsec = 0;
-  wsDesc->connection.timeout.tv_sec = 0;
-  wsDesc->connection.connectionUserData = NULL; //unused in client mode because it's the same as socket user data
-  wsDesc->connection.wsDesc.wsClientDesc = wsDesc; //the connection should know it's parent
-  wsDesc->connection.socketClientDesc = NULL;
-  wsDesc->address = strdup(wsInit->address);
-  if(wsDesc->address == NULL)
+  wsConnection->wsDesc.wsClientDesc->wsUserData = websocketUserData;
+  wsConnection->wsDesc.wsClientDesc->ws_onOpen = wsInit->ws_onOpen;
+  wsConnection->wsDesc.wsClientDesc->ws_onClose = wsInit->ws_onClose;
+  wsConnection->wsDesc.wsClientDesc->ws_onMessage = wsInit->ws_onMessage;
+  wsConnection->wsDesc.wsClientDesc->connection = wsConnection;
+
+  wsConnection->socketClientDesc = NULL;
+  wsConnection->wsDesc.wsClientDesc->address = strdup(wsInit->address);
+  if(wsConnection->wsDesc.wsClientDesc->address == NULL)
   {
     log_err("strdup failed");
     goto ERROR;
   }
-  wsDesc->port = strdup(wsInit->port);
-  if(wsDesc->port == NULL)
+  wsConnection->wsDesc.wsClientDesc->port = strdup(wsInit->port);
+  if(wsConnection->wsDesc.wsClientDesc->port == NULL)
   {
     log_err("strdup failed");
     goto ERROR;
   }
-  wsDesc->endpoint = strdup(wsInit->endpoint);
-  if(wsDesc->address == NULL)
+  wsConnection->wsDesc.wsClientDesc->endpoint = strdup(wsInit->endpoint);
+  if(wsConnection->wsDesc.wsClientDesc->endpoint == NULL)
   {
     log_err("strdup failed");
     goto ERROR;
@@ -1789,22 +1798,21 @@ struct websocket_connection_desc *websocketClient_open(struct websocket_client_i
   socketInit.socket_onClose = websocket_onClose;
   socketInit.socket_onMessage = websocket_onMessage;
 
-  wsDesc->connection.socketClientDesc = socketClient_open(&socketInit, wsDesc);
-  if(!wsDesc->connection.socketClientDesc)
+  wsConnection->socketClientDesc = socketClient_open(&socketInit, wsConnection);
+  if(!wsConnection->socketClientDesc)
   {
     log_err("socketServer_open failed");
     goto ERROR;
   }
-  wsDesc->socketDesc = wsDesc->connection.socketClientDesc;
 
-  socketClient_start(wsDesc->socketDesc);
+  socketClient_start(wsConnection->socketClientDesc);
 
   struct timespec timeoutStartTime;
   struct timespec currentTime;
 
   clock_gettime(CLOCK_MONOTONIC, &timeoutStartTime);
 
-  while(wsDesc->connection.state == WS_STATE_HANDSHAKE)
+  while(wsConnection->state == WS_STATE_HANDSHAKE)
   {
     clock_gettime(CLOCK_MONOTONIC, &currentTime);
     if(currentTime.tv_sec > timeoutStartTime.tv_sec + MESSAGE_TIMEOUT_S)
@@ -1812,9 +1820,9 @@ struct websocket_connection_desc *websocketClient_open(struct websocket_client_i
     usleep(10000);
   }
 
-  return &wsDesc->connection;
+  return wsConnection;
 
-  ERROR: websocketClient_close(&wsDesc->connection);
+  ERROR: websocketClient_close(wsConnection);
   return NULL;
 }
 
@@ -1829,18 +1837,9 @@ void websocketClient_close(struct websocket_connection_desc *wsConnectionDesc)
   if(wsConnectionDesc == NULL)
     return;
 
-  struct websocket_client_desc *wsDesc = wsConnectionDesc->wsDesc.wsClientDesc;
-
-  if(wsDesc == NULL)
-    return;
-
-  if(wsDesc->socketDesc != NULL)
-  {
-    socketClient_close(wsDesc->socketDesc);
-    wsDesc->socketDesc = NULL;
-  }
-  wsDesc->connection.state = WS_STATE_CLOSED;
-  refcnt_unref(wsDesc);
+  freeConnection(wsConnectionDesc);
+  wsConnectionDesc->state = WS_STATE_CLOSED;
+  refcnt_unref(wsConnectionDesc);
 }
 
 /**
