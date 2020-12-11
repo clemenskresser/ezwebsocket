@@ -27,9 +27,9 @@ struct socket_server_init
   //! callback that is called when a connection is closed
   void (*socket_onClose)(void *socketUserData, void *connectionDesc, void *clientUserData);
   //! the listening port as string
-  char *port;
+  const char *port;
   //! the listening address as string
-  char *address;
+  const char *address;
 };
 
 void socketServer_closeConnection(struct socket_connection_desc *socketClientDesc);

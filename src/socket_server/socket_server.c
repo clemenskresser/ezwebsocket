@@ -416,16 +416,14 @@ struct socket_server_desc *socketServer_open(struct socket_server_init *socketIn
 {
   int optval;
   struct addrinfo hints, *serverinfo, *iter;
-
   struct socket_server_desc *socketDesc;
-
 
   memset (&hints, 0, sizeof (hints));
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
   hints.ai_flags = AI_PASSIVE;
 
-  if (getaddrinfo (socketInit->address, socketInit->port, &hints, &serverinfo) != 0)
+  if(getaddrinfo(socketInit->address, socketInit->port, &hints, &serverinfo) != 0)
   {
     log_err("getaddrinfo failed");
     return NULL;

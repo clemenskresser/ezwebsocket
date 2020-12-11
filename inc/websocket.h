@@ -83,9 +83,9 @@ struct websocket_server_init
   void (*ws_onClose)(struct websocket_server_desc *wsDesc, void *websocketUserData, struct websocket_connection_desc *connectionDesc,
                      void *userData);
   //! the listening address
-  char *address;
+  const char *address;
   //! the listening port
-  char *port;
+  const char *port;
 };
 
 //! structure to configure a websocket client socket
