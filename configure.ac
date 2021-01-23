@@ -1,6 +1,6 @@
 
 AC_PREREQ([2.61])
-AC_INIT([ezwebsocket], [0.1], [clemens.kresser@gmail.com])
+AC_INIT([ezwebsocket], [2.0.0], [clemens.kresser@gmail.com])
 AC_CONFIG_AUX_DIR(aux-dist)
 AM_INIT_AUTOMAKE
 
@@ -8,7 +8,7 @@ AC_PROG_MAKE_SET
 AC_PROG_CC
 AC_LANG(C)
 
-CFLAGS="-std=gnu99 -fPIC"
+CFLAGS="-std=gnu11 -fPIC -Wall -Wextra -Wpedantic -O3"
 
 AC_CONFIG_MACRO_DIR([m4])
 

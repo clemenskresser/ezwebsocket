@@ -1,9 +1,11 @@
-/*
- * dyn_buffer.h
+/**
+ * \file      dyn_buffer.h
+ * \author    Clemens Kresser
+ * \date      Mar 23, 2017
+ * \copyright Copyright  2017-2021 Clemens Kresser. All rights reserved.
+ * \license   This project is released under the MIT License.
+ * \brief     Dynamic buffers that are used to merge and split received data
  *
- *  Created on: Mar 23, 2017
- *      Author: Clemens Kresser
- *      License: MIT
  */
 
 #ifndef DYN_BUFFER_H_
@@ -14,9 +16,12 @@
 
 struct dyn_buffer
 {
+  //! pointer to the buffer that holds the data
   char *buffer;
-  int used;
-  int size;
+  //! the number of used bytes
+  size_t used;
+  //! the size of the buffer
+  size_t size;
 };
 
 #define DYNBUFFER_INCREASE_STEPS 1024
@@ -29,7 +34,7 @@ struct dyn_buffer
 
 void dynBuffer_init(struct dyn_buffer *buffer);
 int dynBuffer_increase_to(struct dyn_buffer *buffer, size_t numFreeBytes);
-int dynBuffer_removeTrailingBytes(struct dyn_buffer *buffer, size_t count);
+int dynBuffer_removeLeadingBytes(struct dyn_buffer *buffer, size_t count);
 int dynBuffer_delete(struct dyn_buffer *buffer);
 
 #endif /* DYN_BUFFER_H_ */

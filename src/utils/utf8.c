@@ -1,21 +1,23 @@
-/*
- * utf8.c
+/**
+ * \file      utf8.c
+ * \author    Clemens Kresser
+ * \date      Apr 9, 2017
+ * \copyright Copyright  2017-2021 Clemens Kresser. All rights reserved.
+ * \license   This project is released under the MIT License.
+ * \brief     UTF8 validation functions that are used for the websockets
  *
- *  Created on: Apr 9, 2017
- *      Author: Clemens Kresser
- *      License: MIT
  */
 
 #include "utf8.h"
 #include <stdio.h>
 
 /**
- * \brief: checks a single character if it is valid utf8
+ * \brief Checks a single character if it is valid utf8
  *
- * \param c: the character that should be checked
- * \param [in,out]*handle: stores the last characters if needed start with 0
+ * \param c The character that should be checked
+ * \param [in,out]*handle Stores the last characters if needed start with 0
  *
- * \return: UTF8_STATE_OK, UTF8_STATE_FAIL or UTF8_STATE_BUSY if more characters are needed
+ * \return UTF8_STATE_OK, UTF8_STATE_FAIL or UTF8_STATE_BUSY if more characters are needed
  */
 enum utf8_state utf8_validate_single(char c, unsigned long *handle)
 {
@@ -89,11 +91,11 @@ enum utf8_state utf8_validate_single(char c, unsigned long *handle)
 }
 
 /**
- * \brief: validates if the given string is valid UTF8
+ * \brief Validates if the given string is valid UTF8
  *
- * \param *string: pointer to the string that should be checked
- * \param len: the length of the string
- * \param *handle: pointer to the handle that is used to store the state if using fragmented strings start with 0
+ * \param *string Pointer to the string that should be checked
+ * \param len The length of the string
+ * \param *handle Pointer to the handle that is used to store the state if using fragmented strings start with 0
  *
  *  UTF8_STATE_OK, UTF8_STATE_FAIL or UTF8_STATE_BUSY if more characters are needed
  */

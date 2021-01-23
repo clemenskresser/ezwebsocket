@@ -1,9 +1,11 @@
-/*
- * base64.c
+/**
+ * \file      base64.c
+ * \author    Clemens Kresser
+ * \date      Apr 14, 2017
+ * \copyright Copyright  2017-2021 Clemens Kresser. All rights reserved.
+ * \license   This project is released under the MIT License.
+ * \brief     Handles base64 encoding
  *
- *  Created on: Apr 14, 2017
- *      Author: Clemens Kresser
- *      License: MIT
  */
 
 #include <stddef.h>
@@ -24,12 +26,12 @@ static const char base64_table[64] =
 };
 
 /**
- * \brief: encodes the given 3 bytes to wrBuffer
+ * \brief encodes the given 3 bytes to wrBuffer
  *
- * \param byte0: 1st byte to encode
- * \param byte1: 2nd byte to encode
- * \param byte2: 3rd byte to encode
- * \param [out] wrBuffer: pointer to where the data is written (size must be at least 4 bytes)
+ * \param byte0 1st byte to encode
+ * \param byte1 2nd byte to encode
+ * \param byte2 3rd byte to encode
+ * \param [out] wrBuffer Pointer to where the data is written (size must be at least 4 bytes)
  *
  */
 static inline void encode(unsigned char byte0, unsigned char byte1, unsigned char byte2, char *wrBuffer)
@@ -41,12 +43,12 @@ static inline void encode(unsigned char byte0, unsigned char byte1, unsigned cha
 }
 
 /**
- * \brief: encodes the given data to base64 format
+ * \brief encodes the given data to base64 format
  *
- * \param *data: pointer to the data that should be encoded
- * \param len: the length of the data
+ * \param *data Pointer to the data that should be encoded
+ * \param len The length of the data
  *
- * \return: base64 encoded string or NULL
+ * \return base64 encoded string or NULL
  *
  *  WARNING: return value must be freed after use!
  *
@@ -55,7 +57,7 @@ char *base64_encode(unsigned char *data, size_t len)
 {
   char *encString = malloc(((len + 2) / 3) * 4 + 1);
   char *ptr;
-  int i;
+  size_t i;
   unsigned char help[3];
   int count;
 

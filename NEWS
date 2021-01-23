@@ -1,0 +1,12 @@
+New in 2.0.0:
+
+  - Websocket client
+  - API has changed and it's suggested to use the new API
+    but the old API is still there for backward compatibility
+  - Increased Performance
+  - Used types instead of just void at several places
+  - Minor Bugs fixed
+  - Builds now with -Wall, -Wextra and -Wpedantic
+  - Changed compiler standard from GNU99 to GNU11
+    but will still build with GNU99
+  - Better handling of the onOpen function

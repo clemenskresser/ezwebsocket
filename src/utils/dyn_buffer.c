@@ -1,11 +1,12 @@
-/*
- * dyn_buffer.c
+/**
+ * \file      dyn_buffer.c
+ * \author    Clemens Kresser
+ * \date      Mar 23, 2017
+ * \copyright Copyright  2017-2021 Clemens Kresser. All rights reserved.
+ * \license   This project is released under the MIT License.
+ * \brief     Dynamic buffers that are used to merge and split received data
  *
- *  Created on: Mar 23, 2017
- *      Author: Clemens Kresser
- *      License: MIT
  */
-
 
 #include "dyn_buffer.h"
 
@@ -16,9 +17,9 @@
 
 
 /**
- * \brief: initializes a dynamic buffer
+ * \brief Initializes a dynamic buffer
  *
- * \param *buffer: pointer to the buffer
+ * \param *buffer Pointer to the buffer
  */
 void dynBuffer_init(struct dyn_buffer *buffer)
 {
@@ -28,12 +29,12 @@ void dynBuffer_init(struct dyn_buffer *buffer)
 }
 
 /**
- * \brief: increases the buffer that it has the given amount of free memory
+ * \brief Increases the buffer that it has the given amount of free memory
  *
- * \param *buffer: pointer to the buffer
- * \param numFreeBytes: the number of bytes that should be free after increase
+ * \param *buffer Pointer to the buffer
+ * \param numFreeBytes The number of bytes that should be free after increase
  *
- * \return: 0 if successful else -1
+ * \return 0 if successful else -1
  *
  */
 int dynBuffer_increase_to(struct dyn_buffer *buffer, size_t numFreeBytes)
@@ -75,24 +76,22 @@ int dynBuffer_increase_to(struct dyn_buffer *buffer, size_t numFreeBytes)
 }
 
 /**
- * \brief: removes the given amount of trailing bytes from the buffer
+ * \brief Removes the given amount of leading bytes from the buffer
  *
- * \param *buffer: pointer to the buffer
- * \param count: the number of bytes that should be removed
+ * \param *buffer Pointer to the buffer
+ * \param count The number of bytes that should be removed
  *
  * \return 0 if successful else -1
  */
-int dynBuffer_removeTrailingBytes(struct dyn_buffer *buffer, size_t count)
+int dynBuffer_removeLeadingBytes(struct dyn_buffer *buffer, size_t count)
 {
-  char *newbuf = NULL;
-
   if(buffer->buffer == NULL)
   {
     log_err("empty buffer");
     return -1;
   }
 
-  if (!count)
+  if(!count)
     return 0;
 
   if(buffer->used < count)
@@ -101,19 +100,10 @@ int dynBuffer_removeTrailingBytes(struct dyn_buffer *buffer, size_t count)
     return -1;
   }
 
-  if(buffer->used != count)   //TODO: make this more intelligent
+  if(buffer->used > count)
   {
-    newbuf = malloc(buffer->size - count);
-    if(!newbuf)
-    {
-      log_err("malloc failed");
-      return -1;
-    }
-    memcpy(newbuf, &buffer->buffer[count], buffer->used - count);
-    free(buffer->buffer);
-    buffer->buffer = newbuf;
     buffer->used = buffer->used - count;
-    buffer->size = buffer->size - count;
+    memmove(&buffer->buffer[0], &buffer->buffer[count], buffer->used);
   }
   else
   {
@@ -127,11 +117,11 @@ int dynBuffer_removeTrailingBytes(struct dyn_buffer *buffer, size_t count)
 }
 
 /**
- * \brief: deallocates all memory that was allocated by the buffer
+ * \brief Deallocates all memory that was allocated by the buffer
  *
- * \param *buffer: pointer to the buffer
+ * \param *buffer Pointer to the buffer
  *
- * \return: 0 if successful else -1
+ * \return 0 if successful else -1
  *
  */
 int dynBuffer_delete(struct dyn_buffer *buffer)
