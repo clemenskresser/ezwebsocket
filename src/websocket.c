@@ -2,8 +2,7 @@
  * \file      websocket.c
  * \author    Clemens Kresser
  * \date      Mar 23, 2017
- * \copyright Copyright  2017-2021 Clemens Kresser. All rights reserved.
- * \license   This project is released under the MIT License.
+ * \copyright Copyright 2017-2021 Clemens Kresser MIT License
  * \brief     Handles the websocket specific stuff
  *
  */
@@ -1602,9 +1601,8 @@ int websocket_sendDataFragmentedStart(struct websocket_connection_desc *wsConnec
  * \return 0 if successful else -1
  *
  */
-int websocket_sendDataFragmentedCont(struct websocket_connection_desc *wsConnectionDescriptor, bool fin, const void *msg, size_t len)
+int websocket_sendDataFragmentedCont(struct websocket_connection_desc *wsConnectionDesc, bool fin, const void *msg, size_t len)
 {
-  struct websocket_connection_desc *wsConnectionDesc = wsConnectionDescriptor;
   bool masked = (wsConnectionDesc->wsType == WS_TYPE_CLIENT);
 
   if(wsConnectionDesc->state != WS_STATE_CONNECTED)

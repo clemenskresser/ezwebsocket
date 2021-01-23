@@ -2,8 +2,7 @@
  * \file      dyn_buffer.h
  * \author    Clemens Kresser
  * \date      Mar 23, 2017
- * \copyright Copyright  2017-2021 Clemens Kresser. All rights reserved.
- * \license   This project is released under the MIT License.
+ * \copyright Copyright 2017-2021 Clemens Kresser MIT License
  * \brief     Dynamic buffers that are used to merge and split received data
  *
  */

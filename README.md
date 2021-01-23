@@ -31,8 +31,7 @@ $> gcc example_server.c -lezwebsocket -o example_server
  * \file      example_server.c
  * \author    Clemens Kresser
  * \date      Mar 22, 2017
- * \copyright Copyright  2017-2021 Clemens Kresser. All rights reserved.
- * \license   This project is released under the MIT License.
+ * \copyright Copyright 2017-2021 Clemens Kresser MIT License
  * \brief     simple server example
  *
  */
@@ -138,8 +137,7 @@ $> gcc example_client.c -lezwebsocket -o example_client
  * \file      example_client.c
  * \author    Clemens Kresser
  * \date      Nov 17, 2020
- * \copyright Copyright  2017-2021 Clemens Kresser. All rights reserved.
- * \license   This project is released under the MIT License.
+ * \copyright Copyright 2017-2021 Clemens Kresser MIT License
  * \brief     simple client example
  *
  */

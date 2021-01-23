@@ -2,8 +2,7 @@
  * \file      websocket.h
  * \author    Clemens Kresser
  * \date      Mar 24, 2017
- * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
- * \license   This project is released under the MIT License.
+ * \copyright Copyright 2017-2021 Clemens Kresser MIT License
  * \brief     API of the ezwebsocket library
  *
  */
@@ -138,8 +137,8 @@ void* websocket_getConnectionUserData(struct websocket_connection_desc *wsConnec
 /**
  * \brief Opens a websocket server
  *
- * \param wsInit Pointer to the init struct
- * \param userData: userData for the socket
+ * \param *wsInit Pointer to the init struct
+ * \param *websocketUserData userData for the socket
  *
  * \return the websocket descriptor or NULL in case of error
  */
@@ -148,8 +147,8 @@ struct websocket_server_desc *websocketServer_open(struct websocket_server_init 
 /**
  * \brief Opens a websocket client connection
  *
- * \param wsInit Pointer to the init struct
- * \param websocketUserData UserData for the socket
+ * \param *wsInit Pointer to the init struct
+ * \param *websocketUserData UserData for the socket
  *
  * \return the websocket connection descriptor or NULL in case of error
  */
@@ -166,7 +165,7 @@ void websocketServer_close(struct websocket_server_desc *wsDesc);
 /**
  * \brief Closes a websocket client
  *
- * \param *wsClientDesc Pointer to the websocket client descriptor
+ * \param *wsConnectionDesc Pointer to the websocket client descriptor
  */
 void websocketClient_close(struct websocket_connection_desc *wsConnectionDesc);
 
@@ -196,10 +195,10 @@ void websocket_unref(void *ptr);
 /**
  * \brief Sends binary or text data through websockets
  *
- * \param *wsConnectionDescriptor Pointer to the websocket connection descriptor
- * \param dataType: the datatype (WS_DATA_TYPE_BINARY or WS_DATA_TYPE_TEXT)
- * \param *msg: the payload data
- * \param len: the payload length
+ * \param *wsConnectionDesc Pointer to the websocket connection descriptor
+ * \param dataType the datatype (WS_DATA_TYPE_BINARY or WS_DATA_TYPE_TEXT)
+ * \param *msg the payload data
+ * \param len the payload length
  *
  * \return 0 if successful else -1
  *
@@ -210,7 +209,7 @@ int websocket_sendData(struct websocket_connection_desc *wsConnectionDesc, enum 
  * \brief Closes the given websocket connection
  *
  * \param *wsConnectionDesc Pointer to the websocket connection descriptor
- * \param code: the closing code
+ * \param code the closing code
  */
 void websocket_closeConnection(struct websocket_connection_desc *wsConnectionDesc, enum ws_close_code code);
 
@@ -218,10 +217,10 @@ void websocket_closeConnection(struct websocket_connection_desc *wsConnectionDes
  * \brief Sends fragmented binary or text data through websockets
  *         use websocket_sendDataFragmetedCont for further fragments
  *
- * \param *wsConnectionDescriptor Pointer to the websocket connection descriptor
- * \param dataType: the datatype (WS_DATA_TYPE_BINARY or WS_DATA_TYPE_TEXT)
- * \param *msg: the payload data
- * \param len: the payload length
+ * \param *wsConnectionDesc Pointer to the websocket connection descriptor
+ * \param dataType the datatype (WS_DATA_TYPE_BINARY or WS_DATA_TYPE_TEXT)
+ * \param *msg the payload data
+ * \param len the payload length
  *
  * \return 0 if successful else -1
  *
@@ -233,22 +232,22 @@ int websocket_sendDataFragmentedStart(struct websocket_connection_desc *wsConnec
  *         use sendDataFragmentedStop to stop the transmission
  *
  * \param *wsConnectionDesc Pointer to the websocket connection descriptor
- * \param fin: true => this is the last fragment else false
- * \param *msg: the payload data
- * \param len: the payload length
+ * \param fin true => this is the last fragment else false
+ * \param *msg the payload data
+ * \param len the payload length
  *
  * \return 0 if successful else -1
  *
  */
-int websocket_sendDataFragmentedCont(struct websocket_connection_desc *wsConnectionDescriptor, bool fin, const void *msg, size_t len);
+int websocket_sendDataFragmentedCont(struct websocket_connection_desc *wsConnectionDesc, bool fin, const void *msg, size_t len);
 
 /* ------------------------------ LEGACY FUNCTIONS ------------------------------ */
 
 /**
  * \brief Opens a websocket server
  *
- * \param wsInit Pointer to the init struct
- * \param websocketUserData: userData for the socket
+ * \param *wsInit Pointer to the init struct
+ * \param *websocketUserData: userData for the socket
  *
  * \return the websocket descriptor or NULL in case of error
  *

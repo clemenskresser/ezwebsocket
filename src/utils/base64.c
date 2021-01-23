@@ -2,8 +2,7 @@
  * \file      base64.c
  * \author    Clemens Kresser
  * \date      Apr 14, 2017
- * \copyright Copyright  2017-2021 Clemens Kresser. All rights reserved.
- * \license   This project is released under the MIT License.
+ * \copyright Copyright 2017-2021 Clemens Kresser MIT License
  * \brief     Handles base64 encoding
  *
  */
