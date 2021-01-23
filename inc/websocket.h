@@ -16,6 +16,7 @@ extern "C" {
 #endif
 
 #include <stdbool.h>
+#include <stddef.h>
 
 //! the 2 different websocket data types
 enum ws_data_type
@@ -68,20 +69,18 @@ enum ws_close_code
 struct websocket_server_desc;
 //! descriptor for the websocket connection
 struct websocket_connection_desc;
-//! descriptor for the websocket client
-struct websocket_client_desc;
 
 //! structure to configure a websocket server socket
 struct websocket_server_init
 {
   //! callback that is called when a message is received
-  void (*ws_onMessage)(void *websocketUserData, struct websocket_connection_desc *connectionDesc, void *clientUserData,
+  void (*ws_onMessage)(void *websocketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData,
                        enum ws_data_type dataType, void *msg, size_t len);
   //! callback that is called when a new connection is established
   void* (*ws_onOpen)(void *websocketUserData, struct websocket_server_desc *wsDesc, struct websocket_connection_desc *connectionDesc);
   //! callback that is called when a connection is closed
   void (*ws_onClose)(struct websocket_server_desc *wsDesc, void *websocketUserData, struct websocket_connection_desc *connectionDesc,
-                     void *userData);
+                     void *connectionUserData);
   //! the listening address
   const char *address;
   //! the listening port
@@ -92,13 +91,12 @@ struct websocket_server_init
 struct websocket_client_init
 {
   //! callback that is called when a message is received
-  void (*ws_onMessage)(void *socketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData,
+  void (*ws_onMessage)(void *websocketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData,
                        enum ws_data_type dataType, void *msg, size_t len);
   //! callback that is called when a new connection is established
-  void* (*ws_onOpen)(void *socketUserData, struct websocket_client_desc *wsDesc,
-                     struct websocket_connection_desc *connectionDesc);
+  void* (*ws_onOpen)(void *websocketUserData, struct websocket_connection_desc *connectionDesc);
   //! callback that is called when a connection is closed
-  void (*ws_onClose)(void *socketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData);
+  void (*ws_onClose)(void *websocketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData);
   //! the address of the remote target
   const char *address;
   //! the port of the remote target

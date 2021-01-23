@@ -2,7 +2,7 @@
  * \file      ref_count.h
  * \author    Clemens Kresser
  * \date      Mar 26, 2017
- * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
+ * \copyright Copyright  2017-2021 Clemens Kresser. All rights reserved.
  * \license   This project is released under the MIT License.
  * \brief     Simple reference counting implementation
  *

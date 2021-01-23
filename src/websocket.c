@@ -2,7 +2,7 @@
  * \file      websocket.c
  * \author    Clemens Kresser
  * \date      Mar 23, 2017
- * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
+ * \copyright Copyright  2017-2021 Clemens Kresser. All rights reserved.
  * \license   This project is released under the MIT License.
  * \brief     Handles the websocket specific stuff
  *
@@ -125,8 +125,7 @@ struct websocket_client_desc
   void (*ws_onMessage)(void *socketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData,
                        enum ws_data_type dataType, void *msg, size_t len);
   //! callback that is called when the websocket is connected
-  void* (*ws_onOpen)(void *socketUserData, struct websocket_client_desc *wsDesc,
-                     struct websocket_connection_desc *connectionDesc);
+  void* (*ws_onOpen)(void *socketUserData, struct websocket_connection_desc *connectionDesc);
   //! callback that is called when the websocket is closed
   void (*ws_onClose)(void *socketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData);
   //! pointer to the socket descriptor
@@ -1166,12 +1165,6 @@ static void* websocketServer_onOpen(void *socketUserData, struct socket_connecti
   wsConnectionDesc->lastMessage.complete = false;
   wsConnectionDesc->wsDesc.wsServerDesc = wsDesc;
 
-  if(wsDesc->ws_onOpen != NULL)
-    wsConnectionDesc->connectionUserData = wsDesc->ws_onOpen(wsDesc->wsSocketUserData, wsDesc, wsConnectionDesc);
-
-  if(wsDesc->ws_onOpenLegacy != NULL)
-    wsConnectionDesc->connectionUserData = wsDesc->ws_onOpenLegacy(wsDesc, wsConnectionDesc);
-
   return wsConnectionDesc;
 }
 
@@ -1190,19 +1183,15 @@ static void* websocketClient_onOpen(void *socketUserData, void *socketDesc)
   struct websocket_client_desc *wsDesc = wsConnectionDesc->wsDesc.wsClientDesc;
   (void)socketDesc;
 
-  if(wsDesc->ws_onOpen != NULL)
-    wsConnectionDesc->connectionUserData = wsDesc->ws_onOpen( wsDesc->wsUserData, wsDesc, wsDesc->connection);
-  else
-    wsConnectionDesc->connectionUserData = NULL;
-
-  if(!sendWsHandshakeRequest(wsConnectionDesc))
+  if(sendWsHandshakeRequest(wsConnectionDesc))
   {
-    if(wsDesc->ws_onClose != NULL)
-      wsDesc->ws_onClose(wsDesc->wsUserData, wsDesc->connection, wsConnectionDesc->connectionUserData);
-    wsConnectionDesc->state = WS_STATE_CLOSED;
+    return wsDesc->connection;
   }
-
-  return wsDesc->connection;
+  else
+  {
+    wsConnectionDesc->state = WS_STATE_CLOSED;
+    return NULL;
+  }
 }
 
 /**
@@ -1263,7 +1252,7 @@ static void websocket_onClose(void *socketUserData, void *socketConnectionDesc, 
     free(wsConnectionDesc->lastMessage.data);
   wsConnectionDesc->lastMessage.data = NULL;
 
-  if(wsConnectionDesc->state != WS_STATE_CLOSED)
+  if(wsConnectionDesc->state == WS_STATE_CONNECTED)
   {
     wsConnectionDesc->state = WS_STATE_CLOSED;
 
@@ -1326,7 +1315,6 @@ static void callOnMessage(struct websocket_connection_desc *wsConnectionDesc)
  */
 static size_t websocket_onMessage(void *socketUserData, void *socketConnectionDesc, void *connectionDescriptor, void *msg, size_t len)
 {
-  (void)socketUserData;
   struct websocket_connection_desc *wsConnectionDesc = connectionDescriptor;
   struct ws_header wsHeader = {0};
   struct timespec now;
@@ -1354,6 +1342,8 @@ static size_t websocket_onMessage(void *socketUserData, void *socketConnectionDe
         case WS_TYPE_SERVER:
           if(parseHttpHeader(msg, len, key) == 0)
           {
+            struct websocket_server_desc *wsDesc = socketUserData;
+
             replyKey = calculateSecWebSocketAccept(key);
             if(replyKey == NULL)
             {
@@ -1369,6 +1359,11 @@ static size_t websocket_onMessage(void *socketUserData, void *socketConnectionDe
 
             free(replyKey);
             wsConnectionDesc->state = WS_STATE_CONNECTED;
+            if(wsDesc->ws_onOpen != NULL)
+              wsConnectionDesc->connectionUserData = wsDesc->ws_onOpen(wsDesc->wsSocketUserData, wsDesc, wsConnectionDesc);
+
+            if(wsDesc->ws_onOpenLegacy != NULL)
+              wsConnectionDesc->connectionUserData = wsDesc->ws_onOpenLegacy(wsDesc, wsConnectionDesc);
           }
           else
           {
@@ -1379,7 +1374,14 @@ static size_t websocket_onMessage(void *socketUserData, void *socketConnectionDe
         case WS_TYPE_CLIENT:
           if(checkWsHandshakeReply(wsConnectionDesc, msg, &len))
           {
+            struct websocket_client_desc *wsDesc = wsConnectionDesc->wsDesc.wsClientDesc;
+
             wsConnectionDesc->state = WS_STATE_CONNECTED;
+
+            if(wsDesc->ws_onOpen != NULL)
+              wsConnectionDesc->connectionUserData = wsDesc->ws_onOpen(wsDesc->wsUserData, wsConnectionDesc);
+            else
+              wsConnectionDesc->connectionUserData = NULL;
           }
           else
           {
@@ -1801,7 +1803,7 @@ struct websocket_connection_desc *websocketClient_open(struct websocket_client_i
   wsConnection->socketClientDesc = socketClient_open(&socketInit, wsConnection);
   if(!wsConnection->socketClientDesc)
   {
-    log_err("socketServer_open failed");
+    log_err("socketClient_open failed");
     goto ERROR;
   }
 

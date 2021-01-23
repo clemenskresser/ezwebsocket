@@ -9,3 +9,4 @@ New in 2.0.0:
   - Builds now with -Wall, -Wextra and -Wpedantic
   - Changed compiler standard from GNU99 to GNU11
     but will still build with GNU99
+  - Better handling of the onOpen function

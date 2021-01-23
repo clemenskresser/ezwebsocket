@@ -31,7 +31,7 @@ $> gcc example_server.c -lezwebsocket -o example_server
  * \file      example_server.c
  * \author    Clemens Kresser
  * \date      Mar 22, 2017
- * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
+ * \copyright Copyright  2017-2021 Clemens Kresser. All rights reserved.
  * \license   This project is released under the MIT License.
  * \brief     simple server example
  *
@@ -42,6 +42,16 @@ $> gcc example_server.c -lezwebsocket -o example_server
 #include <websocket.h>
 #include <string.h>
 
+/**
+ * \brief callback that will be called when a connection is established
+ *
+ * \param *websocketUserData Pointer to the websocket user data associated with this socket
+ *                           (data passed by websocketServer_open)
+ * \param *wsDesc Pointer to the websocket server descriptor
+ * \param *connectionDesc Pointer to the connection descriptor
+ *
+ * \return NULL
+ */
 void* onOpen(void *websocketUserData, struct websocket_server_desc *wsDesc,
              struct websocket_connection_desc *connectionDesc)
 {
@@ -52,6 +62,17 @@ void* onOpen(void *websocketUserData, struct websocket_server_desc *wsDesc,
   return NULL;
 }
 
+/**
+ * \brief callback that will be called when a message is received
+ *
+ * \param *websocketUserData Pointer to the websocket user data (data passed by websocketServer_open)
+ * \param *connectionDesc Pointer to the connection descriptor
+ * \param *connectionUserData Pointer to the connection user data (data returned by onOpen callback)
+ * \param dataType The data type of the message (WS_DATA_TYPE_TEXT or WS_DATA_TYPE_BINARY)
+ * \param *msg Pointer to the message
+ * \param len The length of the message
+ *
+ */
 void onMessage(void *websocketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData,
                enum ws_data_type dataType, void *msg, size_t len)
 {
@@ -64,6 +85,15 @@ void onMessage(void *websocketUserData, struct websocket_connection_desc *connec
   websocket_sendData(connectionDesc, dataType, msg, len);
 }
 
+/**
+ * \brief callback that will be called when a connection is closed
+ *
+ * \param *wsDesc Pointer to the websocket descriptor
+ * \param *websocketUserData Pointer to the websocket user data (data passed by websocketServer_open)
+ * \param *connectionDesc Pointer to the connection descriptor
+ * \param *connectionUserData Pointer to the connection user data (data returned by onOpen callback)
+ *
+ */
 void onClose(struct websocket_server_desc *wsDesc, void *websocketUserData,
              struct websocket_connection_desc *connectionDesc, void *connectionUserData)
 {
@@ -94,6 +124,7 @@ int main(int argc, char *argv[])
 
   return 0;
 }
+
 ```
 
 # Websocket client example
@@ -107,7 +138,7 @@ $> gcc example_client.c -lezwebsocket -o example_client
  * \file      example_client.c
  * \author    Clemens Kresser
  * \date      Nov 17, 2020
- * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
+ * \copyright Copyright  2017-2021 Clemens Kresser. All rights reserved.
  * \license   This project is released under the MIT License.
  * \brief     simple client example
  *
@@ -118,8 +149,16 @@ $> gcc example_client.c -lezwebsocket -o example_client
 #include <websocket.h>
 #include <string.h>
 
-void* onOpen(void *socketUserData, struct websocket_client_desc *wsDesc,
-             struct websocket_connection_desc *connectionDesc)
+/**
+ * \brief callback that will be called when a connection is established
+ *
+ * \param *websocketUserData Pointer to the websocket user data associated with this socket
+ *                           (data passed by websocketClient_open)
+ * \param *connectionDesc Pointer to the connection descriptor
+ *
+ * \return NULL
+ */
+void* onOpen(void *websocketUserData, struct websocket_connection_desc *connectionDesc)
 {
   printf("%s()\n", __func__);
 
@@ -128,7 +167,18 @@ void* onOpen(void *socketUserData, struct websocket_client_desc *wsDesc,
   return NULL;
 }
 
-void onMessage(void *socketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData,
+/**
+ * \brief callback that will be called when a message is received
+ *
+ * \param *websocketUserData Pointer to the websocket user data (data passed by websocketClient_open)
+ * \param *connectionDesc Pointer to the connection descriptor
+ * \param *connectionUserData Pointer to the connection user data (data returned by onOpen callback)
+ * \param dataType The data type of the message (WS_DATA_TYPE_TEXT or WS_DATA_TYPE_BINARY)
+ * \param *msg Pointer to the message
+ * \param len The length of the message
+ *
+ */
+void onMessage(void *websocketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData,
                enum ws_data_type dataType, void *msg, size_t len)
 {
   if(dataType == WS_DATA_TYPE_TEXT)
@@ -137,7 +187,15 @@ void onMessage(void *socketUserData, struct websocket_connection_desc *connectio
   }
 }
 
-void onClose(void *socketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData)
+/**
+ * \brief callback that will be called when a connection is closed
+ *
+ * \param *websocketUserData Pointer to the websocket user data (data passed by websocketClient_open)
+ * \param *connectionDesc Pointer to the connection descriptor
+ * \param *connectionUserData Pointer to the connection user data (data returned by onOpen callback)
+ *
+ */
+void onClose(void *websocketUserData, struct websocket_connection_desc *connectionDesc, void *connectionUserData)
 {
   printf("%s()\n", __func__);
 }

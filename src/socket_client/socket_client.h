@@ -2,7 +2,7 @@
  * \file      socket_client.h
  * \author    Clemens Kresser
  * \date      Jun 26, 2020
- * \copyright Copyright 2017-2020 Clemens Kresser. All rights reserved.
+ * \copyright Copyright  2017-2021 Clemens Kresser. All rights reserved.
  * \license   This project is released under the MIT License.
  * \brief     Event based socket client implementation
  *

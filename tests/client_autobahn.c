@@ -19,8 +19,7 @@
 static uint32_t numberOfTestCases = 0;
 static uint32_t currentTestNum = 0;
 
-void* onOpen(void *socketUserData, struct websocket_client_desc *wsDesc,
-             struct websocket_connection_desc *connectionDesc)
+void* onOpen(void *socketUserData, struct websocket_connection_desc *connectionDesc)
 {
   //we just allocate some bytes here to see if we don't have memory leaks
   return malloc(0xDEAD);
