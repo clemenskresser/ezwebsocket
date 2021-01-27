@@ -17,6 +17,7 @@
 #include <stdatomic.h>
 #endif
 
+//! structure with data needed to store the references
 struct ref_cnt_obj
 {
   //! the number of reference holders

@@ -25,13 +25,18 @@
 //! the minimum buffer allocation size
 #define MIN_ALLOC_SIZE 2048
 
+//! States of the socket client
 enum socket_client_state
 {
+  //! disconnected state
   SOCKET_CLIENT_STATE_DISCONNECTED,
+  //! disconnect request state
   SOCKET_CLIENT_STATE_DISCONNECT_REQUEST,
+  //! connected state
   SOCKET_CLIENT_STATE_CONNECTED,
 };
 
+//! structure that contains information about a socket client
 struct socket_client_desc
 {
   //! callback function that gets called when data is received
@@ -46,6 +51,7 @@ struct socket_client_desc
   pthread_t tid;
   //! indicates that the tid is valid
   bool tidValid;
+  //! dynamic buffer for storing the received data
   struct dyn_buffer buffer;
   //! pointer to the session data
   void *sessionData;

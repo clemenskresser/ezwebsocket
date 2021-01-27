@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include "log.h"
 
+//! mapping that is used for base64 conversion
 static const char base64_table[64] =
 {
   'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',

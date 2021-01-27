@@ -7,6 +7,7 @@
  *
  */
 
+//! define needed for asprintf
 #define _GNU_SOURCE
 
 #include <stddef.h>
@@ -28,14 +29,20 @@
 #include <unistd.h>
 #include <limits.h>
 
+//! timeout for fragmented messages
 #define MESSAGE_TIMEOUT_S 30
 
 #undef VERBOSE_MODE
 
+//! if payload length in the websocket header is smaller or equal than this
+//! the extended payload is not used
 #define MAX_DEFAULT_PAYLOAD_LENGTH 125
+//! value of the websocket payload length if the extended 16-bit length is used
 #define EXTENDED_16BIT_PAYLOAD_LENGTH 126
+//! value of the websocket payload length if the extended 64-bit length is used
 #define EXTENDED_64BIT_PAYLOAD_LENGTH 127
 
+//! the different websocket states
 enum ws_state
 {
   WS_STATE_HANDSHAKE,
@@ -43,6 +50,7 @@ enum ws_state
   WS_STATE_CLOSED
 };
 
+//! the websocket op-codes
 enum ws_opcode
 {
   WS_OPCODE_CONTINUATION = 0x00,
@@ -53,12 +61,14 @@ enum ws_opcode
   WS_OPCODE_PONG = 0x0A,
 };
 
+//! the websocket connection types
 enum ws_type
 {
     WS_TYPE_CLIENT,
     WS_TYPE_SERVER
 };
 
+//! descriptor for the websocket server
 struct websocket_server_desc
 {
   //! callback that is called when a message is received on the websocket
@@ -79,6 +89,7 @@ struct websocket_server_desc
   void *wsSocketUserData;
 };
 
+//! structure that holds message data
 struct last_message
 {
   //! the type of data (WS_DATA_TYPE_TEXT or WS_DATA_TYPE_BINARY)
@@ -95,6 +106,7 @@ struct last_message
   char *data;
 };
 
+//! structure that contains information about the websocket connection
 struct websocket_connection_desc
 {
   //! indicates if it is a websocket client or a websocket server
@@ -109,6 +121,7 @@ struct websocket_connection_desc
   void *connectionUserData;
   //! stores the time for message timeouts
   struct timespec timeout;
+  //! union for either client or server descriptor
   union
   {
     //!pointer to the websocket client descriptor (in case of client mode)
@@ -118,6 +131,7 @@ struct websocket_connection_desc
   } wsDesc;
 };
 
+//! structure that contains information about a client connection
 struct websocket_client_desc
 {
   //! callback that is called when a message is received on the websocket
@@ -143,6 +157,7 @@ struct websocket_client_desc
   char *wsKey;
 };
 
+//! the magic key to calculate the websocket handshake accept key
 #define WS_ACCEPT_MAGIC_KEY "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 /**
@@ -171,10 +186,12 @@ static char* calculateSecWebSocketAccept(const char *key)
 //Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==
 //Sec-WebSocket-Version: 13
 
+//! websocket handshake key identifier
 #define WS_HS_KEY_ID "Sec-WebSocket-Key:"
+//! websocket handshake key identifier length
 #define WS_HS_KEY_LEN 25
 
-/*
+/**
  * \brief Parses the http header and extracts the Sec-WebSocket-Key
  *
  * \param *wsHeader Pointer to the string with the header
@@ -220,6 +237,7 @@ static int parseHttpHeader(const char *wsHeader, size_t len, char *key)
   return 0;
 }
 
+//! blueprint for the websocket handshake reply
 #define WS_HANDSHAKE_REPLY_BLUEPRINT "HTTP/1.1 101 Switching Protocols\r\n" \
                                      "Upgrade: websocket\r\n" \
                                      "Connection: Upgrade\r\n" \
@@ -248,6 +266,7 @@ static int sendWsHandshakeReply(struct socket_connection_desc *socketConnectionD
   return socketServer_send(socketConnectionDesc, replyHeader, strlen(replyHeader));
 }
 
+//! websocket handshake reply identifier
 #define WS_HS_REPLY_ID "Sec-WebSocket-Accept:"
 
 
@@ -256,7 +275,7 @@ static int sendWsHandshakeReply(struct socket_connection_desc *socketConnectionD
  *
  * \param *wsConnectionDesc Pointer to the websocket connection descriptor
  * \param *header Pointer to the header
- * \param[in-out] len Input the length of the message output the length of the header
+ * \param[in,out] len Input the length of the message output the length of the header
  *
  * \return True => handshake correct else false
  */
@@ -321,7 +340,7 @@ static bool checkWsHandshakeReply(struct websocket_connection_desc *wsConnection
 /**
  * \brief Sends the websocket handshake request
  *
- * \param *wsDesc Pointer to the websocket client descriptor
+ * \param *wsConnectionDesc Pointer to the websocket client descriptor
  *
  * \return True if successful else false
  */
@@ -393,6 +412,7 @@ static bool sendWsHandshakeRequest(struct websocket_connection_desc *wsConnectio
 // https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
 // licensed under CC-BY-SA 2.5.
 
+//! structure that holds all data from the websocket header
 struct ws_header
 {
   //! fin flag received
@@ -413,6 +433,7 @@ struct ws_header
  * \brief Prints the websocket header (for debugging purpose only)
  *
  * \param *header Pointer to the header
+ *
  */
 static void  __attribute__((unused)) printWsHeader(const struct ws_header *header)
 {
@@ -708,6 +729,7 @@ static bool checkCloseCode(enum ws_close_code code)
   }
 }
 
+//! the states of a websocket message
 enum ws_msg_state
 {
   WS_MSG_STATE_ERROR,
@@ -1229,7 +1251,7 @@ static void callOnClose(struct websocket_connection_desc *wsConnectionDesc)
  *         frees the websocket client descriptor
  *
  * \param *socketUserData The websocket descriptor
- * \param *socketClientDesc The connection descriptor from the socket server/client
+ * \param *socketConnectionDesc The connection descriptor from the socket server/client
  * \param *wsConnectionDescriptor The websocket connection descriptor
  *
  */
@@ -1554,7 +1576,7 @@ int websocket_sendData(struct websocket_connection_desc *wsConnectionDesc, enum 
  * \brief Sends fragmented binary or text data through websockets
  *         use websocket_sendDataFragmetedCont for further fragments
  *
- * \param *wsConnectionDescriptor Pointer to the websocket connection descriptor
+ * \param *wsConnectionDesc Pointer to the websocket connection descriptor
  * \param dataType The datatype (WS_DATA_TYPE_BINARY or WS_DATA_TYPE_TEXT)
  * \param *msg The payload data
  * \param len The payload length

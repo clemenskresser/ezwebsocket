@@ -17,6 +17,7 @@ struct socket_connection_desc;
 //! prototype for the socket server descriptor
 struct socket_server_desc;
 
+//! structure with data needed to create a socket server
 struct socket_server_init
 {
   //! callback that is called when data is received

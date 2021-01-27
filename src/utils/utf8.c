@@ -14,7 +14,7 @@
  * \brief Checks a single character if it is valid utf8
  *
  * \param c The character that should be checked
- * \param [in,out]*handle Stores the last characters if needed start with 0
+ * \param[in,out] *handle Stores the last characters if needed start with 0
  *
  * \return UTF8_STATE_OK, UTF8_STATE_FAIL or UTF8_STATE_BUSY if more characters are needed
  */

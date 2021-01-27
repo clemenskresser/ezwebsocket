@@ -26,15 +26,19 @@
 #include <netinet/tcp.h>
 
 
+//! starting size of the message buffer (will be increased everytime the buffer is to small)
 #define READ_SIZE 1024
 
-
+//! States of the socket connection
 enum socket_connection_state
 {
+  //! socket connected state
   SOCKET_SESSION_STATE_CONNECTED,
+  //! socket disconnected state
   SOCKET_SESSION_STATE_DISCONNECTED,
 };
 
+//! structure that holds information about the connection
 struct socket_connection_desc
 {
   //! the connection state
@@ -51,14 +55,16 @@ struct socket_connection_desc
   void *connectionUserData;
 };
 
+//! structure needed for the linked list that contains all connections
 struct socket_connection_list_element
 {
-  //descriptor of the connection
+  //! descriptor of the connection
   struct socket_connection_desc *desc;
   //! the next element in the list
   struct socket_connection_list_element *next;
 };
 
+//! structure that stores all data of a socket server
 struct socket_server_desc
 {
   //! list that holds all connections
@@ -316,8 +322,7 @@ static int startConnection(int socketFd, struct socket_server_desc *socketDesc)
 /**
  * \brief closes the given connection
  *
- * \param *socketDesc Pointer to the socket descriptor
- * \param *desc Pointer to the connection descriptor
+ * \param *socketConnectionDesc Pointer to the socket connection descriptor
  */
 void socketServer_closeConnection(struct socket_connection_desc *socketConnectionDesc)
 {
@@ -349,12 +354,10 @@ int socketServer_send(struct socket_connection_desc *connectionDesc, void *msg, 
   return ((size_t)rc == len ? 0 : -1);
 }
 
-#define BUFSIZE 20
-
 /**
  * \brief processes connection requests
  *
- * \param *socketDesc Pointer to the socket descriptor
+ * \param *sockDesc Pointer to the socket descriptor
  *
  * \return NULL
  *
@@ -407,7 +410,7 @@ static void *socketServerThread(void *sockDesc)
  * \brief opens a socket server
  *
  * \param *socketInit Pointer to the socket init struct
- * \param * socketUserData Pointer to the user data that should be used
+ * \param *socketUserData Pointer to the user data that should be used
  *
  * \return pointer to the socket descriptor
  */

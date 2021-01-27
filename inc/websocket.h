@@ -131,6 +131,8 @@ struct websocket_init
  *
  * \param *wsConnectionDesc Pointer to the websocket client descriptor
  *
+ * \return Pointer to the websocket user data
+ *
  */
 void* websocket_getConnectionUserData(struct websocket_connection_desc *wsConnectionDesc);
 

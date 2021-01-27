@@ -13,6 +13,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+//! UTF8 validate states
 enum utf8_state
 {
   UTF8_STATE_OK,

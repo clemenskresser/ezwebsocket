@@ -9,6 +9,7 @@
 
 #include "log.h"
 
+//! variable that stores if debugging is enabled
 bool debugEnabled = false;
 
 /**
