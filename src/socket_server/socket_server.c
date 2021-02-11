@@ -366,12 +366,12 @@ static void *socketServerThread(void *sockDesc)
 {
   struct socket_server_desc *socketDesc = sockDesc;
   int socketChildFd;
-  socklen_t clientlen;
-  struct sockaddr_in clientAddr;
+  socklen_t connectionAddrLen;
+  struct sockaddr_in connectionAddr;
   struct timeval timeout= {.tv_sec = 2, .tv_usec = 0};
   int res;
 
-  clientlen = sizeof(clientAddr);
+  connectionAddrLen = sizeof(connectionAddr);
 
   while(socketDesc->running)
   {
@@ -394,7 +394,7 @@ static void *socketServerThread(void *sockDesc)
       if(FD_ISSET(socketDesc->socketFd, &(socketDesc->readfds)))
       {
         //wait for connection requests
-        socketChildFd = accept(socketDesc->socketFd, (struct sockaddr *) &clientAddr, &clientlen);
+        socketChildFd = accept(socketDesc->socketFd, (struct sockaddr *) &connectionAddr, &connectionAddrLen);
         if(socketChildFd < 0)
           log_err("ERROR on accept");
 
