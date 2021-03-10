@@ -22,3 +22,5 @@ libtool
 .settings/
 tests/bin/
 tests/reports/
+docs/
+Doxyfile

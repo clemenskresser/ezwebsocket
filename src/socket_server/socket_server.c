@@ -179,17 +179,15 @@ static int removeConnection(struct socket_server_desc *socketDesc, struct socket
  */
 static void closeAllConnections(struct socket_server_desc *socketDesc)
 {
-  struct socket_connection_list_element *listElement, *prevListElement;
+  struct socket_connection_list_element *listElement;
 
   pthread_mutex_lock(&socketDesc->listMutex);
   {
     listElement = socketDesc->list;
     while(listElement)
     {
-      prevListElement = listElement;
       listElement = listElement->next;
-      socketDesc->list = listElement;
-      socketServer_closeConnection(prevListElement->desc);
+      socketServer_closeConnection(listElement->desc);
     }
   }
   pthread_mutex_unlock(&socketDesc->listMutex);
@@ -443,6 +441,7 @@ struct socket_server_desc *socketServer_open(struct socket_server_init *socketIn
   socketDesc->socket_onMessage = socketInit->socket_onMessage;
   socketDesc->socketUserData = socketUserData;
   socketDesc->list = NULL;
+  socketDesc->numConnections = 0;
   pthread_mutex_init(&socketDesc->listMutex, NULL);
 
   for(iter = serverinfo; iter != NULL; iter = iter->ai_next)
@@ -521,10 +520,15 @@ struct socket_server_desc *socketServer_open(struct socket_server_init *socketIn
  */
 void socketServer_close(struct socket_server_desc *socketDesc)
 {
+  if(socketDesc == NULL)
+      return;
+
   log_dbg("stopping socket server.\n");
   closeAllConnections(socketDesc);
   socketDesc->running = false;
   pthread_join(socketDesc->tid, NULL);
+  while(socketDesc->numConnections > 0)
+      usleep(300000);
   pthread_mutex_destroy(&socketDesc->listMutex);
   close(socketDesc->socketFd);
   free(socketDesc);
