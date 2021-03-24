@@ -28,6 +28,7 @@
 #include "utils/base64.h"
 #include <unistd.h>
 #include <limits.h>
+#include <pthread.h>
 
 //! timeout for fragmented messages
 #define MESSAGE_TIMEOUT_S 30
@@ -129,6 +130,10 @@ struct websocket_connection_desc
     //!pointer to the websocket server descriptor (in case of server mode)
     struct websocket_server_desc *wsServerDesc;
   } wsDesc;
+  //! mutex to protect the send function
+  pthread_mutex_t sendMutex;
+  //! indicates if the send mutex is valid
+  bool sendMutexValid;
 };
 
 //! structure that contains information about a client connection
@@ -696,6 +701,32 @@ static int sendDataLowLevel(struct websocket_connection_desc *wsConnectionDesc, 
 }
 
 /**
+ * \brief Sends data through websockets with custom opcodes and locks the send mutex
+ *
+ * \param *wsConnectionDesc Pointer to the websocket connection descriptor
+ * \param opcode The opcode to use
+ * \param fin True if this is the last frame of a sequence else false
+ * \param masked True => send masked (client to server) else false (server to client)
+ * \param *msg The payload data
+ * \param len The payload length
+ *
+ * \return 0 if successful else -1
+ */
+static int sendDataLowLevelTakeMutex(struct websocket_connection_desc *wsConnectionDesc, enum ws_opcode opcode,
+                                     bool fin, bool masked, const void *msg, size_t len)
+{
+  int retVal;
+
+  pthread_mutex_lock(&wsConnectionDesc->sendMutex);
+  {
+    retVal = sendDataLowLevel(wsConnectionDesc, opcode, fin, masked, msg, len);
+  }
+  pthread_mutex_unlock(&wsConnectionDesc->sendMutex);
+
+  return retVal;
+}
+
+/**
  * \brief Checks if the given close code is valid
  *
  * \param code The code that should be checked
@@ -952,7 +983,7 @@ static enum ws_msg_state handlePingMessage(struct websocket_connection_desc *wsC
       else
         temp = NULL;
 
-      if(sendDataLowLevel(wsConnectionDesc, WS_OPCODE_PONG, true, masked, temp, header->payloadLength) == 0)
+      if(sendDataLowLevelTakeMutex(wsConnectionDesc, WS_OPCODE_PONG, true, masked, temp, header->payloadLength) == 0)
         rc = WS_MSG_STATE_NO_USER_DATA;
       else
         rc = WS_MSG_STATE_ERROR;
@@ -961,7 +992,7 @@ static enum ws_msg_state handlePingMessage(struct websocket_connection_desc *wsC
     }
     else
     {
-      if(sendDataLowLevel(wsConnectionDesc, WS_OPCODE_PONG, true, masked, &data[header->payloadStartOffset],
+      if(sendDataLowLevelTakeMutex(wsConnectionDesc, WS_OPCODE_PONG, true, masked, &data[header->payloadStartOffset],
           header->payloadLength) == 0)
         return WS_MSG_STATE_NO_USER_DATA;
       else
@@ -1066,7 +1097,7 @@ static enum ws_msg_state handleDisconnectMessage(struct websocket_connection_des
       if((header->payloadLength == 2)
           || utf8_validate((char*)&data[header->payloadStartOffset + 2], header->payloadLength - 2, &utf8Handle))
       {
-        if(sendDataLowLevel(wsConnectionDesc, WS_OPCODE_DISCONNECT, true, masked, &data[header->payloadStartOffset],
+        if(sendDataLowLevelTakeMutex(wsConnectionDesc, WS_OPCODE_DISCONNECT, true, masked, &data[header->payloadStartOffset],
             header->payloadLength) == 0)
           rc = WS_MSG_STATE_NO_USER_DATA;
         else
@@ -1174,6 +1205,9 @@ static void* websocketServer_onOpen(void *socketUserData, struct socket_connecti
 
   refcnt_ref(socketConnectionDesc);
   wsConnectionDesc = refcnt_allocate(sizeof(struct websocket_connection_desc), NULL);
+  if(wsConnectionDesc == NULL)
+    goto ERROR;
+
   memset(wsConnectionDesc, 0, sizeof(struct websocket_connection_desc));
   wsConnectionDesc->wsType = WS_TYPE_SERVER;
   wsConnectionDesc->socketClientDesc = socketConnectionDesc;
@@ -1186,7 +1220,22 @@ static void* websocketServer_onOpen(void *socketUserData, struct socket_connecti
   wsConnectionDesc->lastMessage.complete = false;
   wsConnectionDesc->wsDesc.wsServerDesc = wsDesc;
 
+  if(pthread_mutex_init(&wsConnectionDesc->sendMutex, NULL) != 0)
+    goto ERROR;
+
+  wsConnectionDesc->sendMutexValid = true;
+
   return wsConnectionDesc;
+
+  ERROR:
+  if(wsConnectionDesc != NULL)
+  {
+    if(wsConnectionDesc->sendMutexValid)
+      pthread_mutex_destroy(&wsConnectionDesc->sendMutex);
+    socketServer_closeConnection(socketConnectionDesc);
+    refcnt_unref(wsConnectionDesc);
+  }
+  return NULL;
 }
 
 /**
@@ -1285,6 +1334,8 @@ static void websocket_onClose(void *socketUserData, void *socketConnectionDesc, 
     if(wsConnectionDesc->socketClientDesc)
       refcnt_unref(wsConnectionDesc->socketClientDesc);
     wsConnectionDesc->socketClientDesc = NULL;
+    if(wsConnectionDesc->sendMutexValid)
+      pthread_mutex_destroy(&wsConnectionDesc->sendMutex);
     refcnt_unref(wsConnectionDesc);
   }
 }
@@ -1569,7 +1620,7 @@ int websocket_sendData(struct websocket_connection_desc *wsConnectionDesc, enum 
       return -1;
   }
 
-  return sendDataLowLevel(wsConnectionDesc, opcode, true, masked, msg, len);
+  return sendDataLowLevelTakeMutex(wsConnectionDesc, opcode, true, masked, msg, len);
 }
 
 /**
@@ -1608,6 +1659,8 @@ int websocket_sendDataFragmentedStart(struct websocket_connection_desc *wsConnec
       return -1;
   }
 
+  pthread_mutex_lock(&wsConnectionDesc->sendMutex);
+
   return sendDataLowLevel(wsConnectionDesc, opcode, false, masked, msg, len);
 }
 
@@ -1630,7 +1683,12 @@ int websocket_sendDataFragmentedCont(struct websocket_connection_desc *wsConnect
   if(wsConnectionDesc->state != WS_STATE_CONNECTED)
     return -1;
 
-  return sendDataLowLevel(wsConnectionDesc, WS_OPCODE_CONTINUATION, fin, masked, msg, len);
+  int retVal = sendDataLowLevel(wsConnectionDesc, WS_OPCODE_CONTINUATION, fin, masked, msg, len);
+
+  if(fin == true)
+    pthread_mutex_unlock(&wsConnectionDesc->sendMutex);
+
+  return retVal;
 }
 
 /**
@@ -1647,7 +1705,7 @@ void websocket_closeConnection(struct websocket_connection_desc *wsConnectionDes
   help[0] = (unsigned long)code >> 8;
   help[1] = (unsigned long)code & 0xFF;
 
-  sendDataLowLevel(wsConnectionDesc, WS_OPCODE_DISCONNECT, true, masked, help, 2);
+  sendDataLowLevelTakeMutex(wsConnectionDesc, WS_OPCODE_DISCONNECT, true, masked, help, 2);
 
   if(wsConnectionDesc->lastMessage.data && wsConnectionDesc->lastMessage.complete)
     refcnt_unref(wsConnectionDesc->lastMessage.data);
@@ -1785,6 +1843,10 @@ struct websocket_connection_desc *websocketClient_open(struct websocket_client_i
   wsConnection->wsDesc.wsClientDesc->ws_onClose = wsInit->ws_onClose;
   wsConnection->wsDesc.wsClientDesc->ws_onMessage = wsInit->ws_onMessage;
   wsConnection->wsDesc.wsClientDesc->connection = wsConnection;
+  if(pthread_mutex_init(&wsConnection->sendMutex, NULL) != 0)
+    goto ERROR;
+
+  wsConnection->sendMutexValid = true;
 
   wsConnection->socketClientDesc = NULL;
   wsConnection->wsDesc.wsClientDesc->address = strdup(wsInit->address);
@@ -1858,6 +1920,9 @@ void websocketClient_close(struct websocket_connection_desc *wsConnectionDesc)
 {
   if(wsConnectionDesc == NULL)
     return;
+
+  if(wsConnectionDesc->sendMutexValid)
+    pthread_mutex_destroy(&wsConnectionDesc->sendMutex);
 
   freeConnection(wsConnectionDesc);
   wsConnectionDesc->state = WS_STATE_CLOSED;
