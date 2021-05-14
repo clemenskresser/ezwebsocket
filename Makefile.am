@@ -1,3 +1,0 @@
-SUBDIRS = inc src
-AM_LDFLAGS = -shared -O3
-ACLOCAL_AMFLAGS = -I m4

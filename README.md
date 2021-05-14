@@ -15,10 +15,10 @@ Simple Websocket Library that supports server and client written in C
 # Installation:
 
 * download and extract
-* $> ./autogen.sh
-* $> ./configure --prefix=/usr
-* $> make
-* $> sudo make install
+* $> meson build_dir -D examples=false
+* $> cd build_dir
+* $> ninja
+* $> sudo ninja install
 
 # Websocket server example
 
